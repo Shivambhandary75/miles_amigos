@@ -1,5 +1,5 @@
 import { useState } from "react";
-
+import axios from 'axios'
 export default function Signup({ switchToLogin }) {
   const [username,setUsername]=useState("");
   const [email, setEmail] = useState("");
@@ -7,13 +7,28 @@ export default function Signup({ switchToLogin }) {
   const [confirmPassword, setConfirmPassword] = useState("");
  
 
-  const handleSignup = (e) => {
+  const handleSignup = async(e) => {
     e.preventDefault();
     if (password !== confirmPassword) {
       alert("Passwords do not match!");
       return;
     }
-    alert(`Signing up with\nEmail: ${email}\nPassword: ${password}`);
+
+    try {
+      const response=await axios.post(`${import.meta.env.VITE_API_URL}/api/users/register`,{
+        name:username,
+        email:email,
+        password:password,
+        
+      }
+      ) 
+
+      console.log(response.data)
+    } catch (error) {
+      console.log("registration failed",error)
+      
+    }
+ 
   };
 
   return (

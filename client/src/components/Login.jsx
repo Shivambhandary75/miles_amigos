@@ -1,11 +1,21 @@
 import { useState } from "react";
-
+import axios from "axios";
 export default function Login({ switchToSignup }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleLogin = (e) => {
+  const handleLogin = async(e) => {
     e.preventDefault();
+    try {
+       const response=await axios.post(`${import.meta.env.VITE_API_URL}/api/users/login`,{
+        email:email,
+        password:password,
+       })
+       console.log(response.data)
+
+    } catch (error) {
+      console.log(error)
+    }
     alert(`Logging in with\nEmail: ${email}\nPassword: ${password}`);
   };
 
