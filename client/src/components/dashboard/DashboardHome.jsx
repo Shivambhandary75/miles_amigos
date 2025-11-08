@@ -4,8 +4,10 @@ import liveIcon from '../../assets/icons8-live-50.png'
 import messagesIcon from '../../assets/icons8-messages-50.png'
 import mapIcon from '../../assets/icons8-map-50.png'
 import wallet from "../../assets/icons8-rupee-50.png"
+import safetyIcon from '../../assets/icons8-safety-50.png'
+import siren from '../../assets/icons8-siren-50.png'
 
-export default function DashboardHome() {
+export default function DashboardHome({ onNavigate }) {
   const stats = [
     { icon: carIcon, label: 'Rides Offered', value: '12', color: 'from-green-500 to-green-600' },
     { icon: searchIcon, label: 'Rides Taken', value: '8', color: 'from-green-500 to-green-600' },
@@ -42,17 +44,23 @@ export default function DashboardHome() {
             <span></span> Quick Actions
           </h2>
           <div className="grid grid-cols-2 gap-4">
-            <button className="bg-gradient-to-br from-green-500 to-green-600 text-white py-4 px-4 rounded-xl font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2">
+            <button onClick={() => onNavigate && onNavigate('offerRide')} className="bg-gradient-to-br from-green-500 to-green-600 text-white py-4 px-4 rounded-xl font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2">
               <img src={carIcon} alt="Offer Ride" className="w-5 h-5" /> Offer Ride
             </button>
-            <button className="bg-gradient-to-br from-green-500 to-green-600 text-white py-4 px-4 rounded-xl font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2">
+            <button onClick={() => onNavigate && onNavigate('findRide')} className="bg-gradient-to-br from-green-500 to-green-600 text-white py-4 px-4 rounded-xl font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2">
               <img src={searchIcon} alt="Find Ride" className="w-5 h-5" /> Find Ride
             </button>
-            <button className="bg-gradient-to-br from-green-500 to-green-600 text-white py-4 px-4 rounded-xl font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2">
+            <button onClick={() => onNavigate && onNavigate('messages')} className="bg-gradient-to-br from-green-500 to-green-600 text-white py-4 px-4 rounded-xl font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2">
               <img src={messagesIcon} alt="Messages" className="w-5 h-5" /> Messages
             </button>
-            <button className="bg-gradient-to-br from-green-500 to-green-600 text-white py-4 px-4 rounded-xl font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2">
+            <button onClick={() => onNavigate && onNavigate('map')} className="bg-gradient-to-br from-green-500 to-green-600 text-white py-4 px-4 rounded-xl font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2">
               <img src={mapIcon} alt="Live Map" className="w-5 h-5" /> Live Map
+            </button>
+            <button onClick={() => onNavigate && onNavigate('rideFeed')} className="bg-gradient-to-br from-green-500 to-green-600 text-white py-4 px-4 rounded-xl font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2">
+              <img src={liveIcon} alt="Live Rides" className="w-5 h-5" /> Live Rides
+            </button>
+            <button onClick={() => onNavigate && onNavigate('reportSafety')} className="bg-gradient-to-br from-red-500 to-red-600 text-white py-4 px-4 rounded-xl font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2">
+              <img src={siren} alt="Emergency" className="w-5 h-5" />  Emergency
             </button>
           </div>
         </div>
