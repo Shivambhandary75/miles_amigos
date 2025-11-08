@@ -26,7 +26,7 @@ export default function LandingPage() {
         </p>
         <button
           onClick={() => navigate("/auth")}
-          className="px-6 py-3 bg-white text-green-950 font-semibold rounded-lg hover:bg-purple-100 transition shadow-lg"
+          className="px-6 py-3 bg-white text-green-950 font-semibold rounded-lg hover:bg-purple-100 transition shadow-lg cursor-pointer"
         >
           Get Started
         </button>

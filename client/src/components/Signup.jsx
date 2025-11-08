@@ -1,11 +1,13 @@
 import { useState } from "react";
 import axios from 'axios'
+import { useNavigate } from 'react-router-dom'
+
 export default function Signup({ switchToLogin }) {
   const [username,setUsername]=useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
- 
+  const navigate = useNavigate()
 
   const handleSignup = async(e) => {
     e.preventDefault();
@@ -14,32 +16,19 @@ export default function Signup({ switchToLogin }) {
       return;
     }
 
-    try {
-      const response=await axios.post(`${import.meta.env.VITE_API_URL}/api/users/register`,{
-        name:username,
-        email:email,
-        password:password,
-        
-      }
-      ) 
-
-      console.log(response.data)
-    } catch (error) {
-      console.log("registration failed",error)
-      
-    }
- 
+    // For now, just redirect to dashboard
+    navigate('/dashboard')
   };
 
   return (
-    <div>
-      <h2 className="text-3xl font-bold mb-6 text-center text-white">Sign Up</h2>
+    <div className="bg-white/20 backdrop-blur-md p-8 rounded-2xl border border-white/30 shadow-xl">
+      <h2 className="text-3xl font-bold mb-6 text-center text-black">Sign Up</h2>
         <input
           type="text"
           placeholder="Username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-white mb-4"
+          className="w-full px-4 py-2 border border-gray-400 rounded bg-white/80 text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-600 mb-4"
           required
         />
       <form onSubmit={handleSignup} className="flex flex-col gap-4">
@@ -48,7 +37,7 @@ export default function Signup({ switchToLogin }) {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-white"
+          className="w-full px-4 py-2 border border-gray-400 rounded bg-white/80 text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-600"
           required
         />
         <input
@@ -56,7 +45,7 @@ export default function Signup({ switchToLogin }) {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-white"
+          className="w-full px-4 py-2 border border-gray-400 rounded bg-white/80 text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-600"
           required
         />
         <input
@@ -64,21 +53,21 @@ export default function Signup({ switchToLogin }) {
           placeholder="Confirm Password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
-          className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-white"
+          className="w-full px-4 py-2 border border-gray-400 rounded bg-white/80 text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-600"
           required
         />
         <button
           type="submit"
-          className="bg-green-600 text-white py-2 rounded hover:bg-green-700 transition"
+          className="bg-green-600 text-white py-2 rounded hover:bg-green-700 transition  cursor-pointer"
         >
           Sign Up
         </button>
       </form>
-      <p className="mt-4 text-center text-white">
+      <p className="mt-4 text-center text-black">
         Already have an account?{" "}
         <button
           onClick={switchToLogin}
-          className="text-green-950 font-semibold hover:underline"
+          className="text-purple-950 font-semibold hover:underline cursor-pointer"
         >
           Login
         </button>
