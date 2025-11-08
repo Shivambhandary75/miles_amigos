@@ -1,12 +1,13 @@
 import { useState } from 'react'
+import ConfirmationDialog from '../ConfirmationDialog'
 import searchIcon from '../../assets/icons8-search-50.png'
 import ratingIcon from '../../assets/icons8-rating-50.png'
 
 export default function FindRide() {
   const mockRides = [
-    { from: 'Downtown', to: 'Airport', seats: 3, price: '₹450', driver: 'John', rating: 4.8 },
-    { from: 'Mall', to: 'Station', seats: 2, price: '₹120', driver: 'Sarah', rating: 4.9 },
-    { from: 'Office', to: 'Gym', seats: 1, price: '₹80', driver: 'Mike', rating: 4.7 },
+    { id: 1, from: 'Downtown', to: 'Airport', seats: 3, price: '₹450', driver: 'John', rating: 4.8 },
+    { id: 2, from: 'Mall', to: 'Station', seats: 2, price: '₹120', driver: 'Sarah', rating: 4.9 },
+    { id: 3, from: 'Office', to: 'Gym', seats: 1, price: '₹80', driver: 'Mike', rating: 4.7 },
   ]
 
   const [from, setFrom] = useState('')
@@ -15,6 +16,9 @@ export default function FindRide() {
   const [passengers, setPassengers] = useState(1)
   const [notes, setNotes] = useState('')
   const [results, setResults] = useState(mockRides)
+  const [showBookDialog, setShowBookDialog] = useState(false)
+  const [selectedRide, setSelectedRide] = useState(null)
+  const [isBooking, setIsBooking] = useState(false)
 
   const handleSearch = (e) => {
     e.preventDefault()
@@ -30,8 +34,35 @@ export default function FindRide() {
     console.log('Searching rides with', { from, to, date, passengers, notes })
   }
 
+  const handleBookClick = (ride) => {
+    setSelectedRide(ride)
+    setShowBookDialog(true)
+  }
+
+  const confirmBookRide = () => {
+    setIsBooking(true)
+    setTimeout(() => {
+      setIsBooking(false)
+      setShowBookDialog(false)
+      console.log('Ride booked:', selectedRide)
+      alert(`Booking confirmed with ${selectedRide.driver}!`)
+      setSelectedRide(null)
+    }, 1000)
+  }
+
   return (
     <section>
+      <ConfirmationDialog
+        isOpen={showBookDialog}
+        title="Confirm Booking"
+        message={selectedRide ? `Book ride with ${selectedRide.driver} from ${selectedRide.from} to ${selectedRide.to} for ₹${selectedRide.price}?` : ''}
+        confirmText="Book Now"
+        cancelText="Cancel"
+        isDangerous={false}
+        isLoading={isBooking}
+        onConfirm={confirmBookRide}
+        onCancel={() => setShowBookDialog(false)}
+      />
       <div className="mb-10">
         <h1 className="text-4xl font-bold text-white mb-2">Find a Ride</h1>
         <p className="text-gray-400">Search and book available rides</p>
@@ -122,7 +153,7 @@ export default function FindRide() {
                   <span className="text-green-400 font-bold">{ride.price}</span>
                   <span className="text-gray-400">{ride.seats} seats</span>
                 </div>
-                <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition">Book</button>
+                <button onClick={() => handleBookClick(ride)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition">Book</button>
               </div>
             </div>
           ))}
