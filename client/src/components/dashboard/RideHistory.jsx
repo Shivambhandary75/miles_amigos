@@ -17,6 +17,7 @@ export default function RideHistory() {
       seats: 3,
       fare: '$28.50',
       status: 'completed',
+      role: 'passenger',
     },
     {
       id: 2,
@@ -29,6 +30,7 @@ export default function RideHistory() {
       seats: 2,
       fare: '$15.00',
       status: 'completed',
+      role: 'driver',
     },
     {
       id: 3,
@@ -41,6 +43,7 @@ export default function RideHistory() {
       seats: 4,
       fare: '$22.75',
       status: 'completed',
+      role: 'passenger',
     },
     {
       id: 4,
@@ -53,6 +56,7 @@ export default function RideHistory() {
       seats: 1,
       fare: '$18.00',
       status: 'cancelled',
+      role: 'driver',
     },
   ]
 
@@ -74,6 +78,16 @@ export default function RideHistory() {
       case 'cancelled': return '✗'
       default: return '⏳'
     }
+  }
+
+  const getRoleColor = (role) => {
+    return role === 'driver' 
+      ? 'bg-blue-500/10 border-blue-500/30 text-blue-300' 
+      : 'bg-purple-500/10 border-purple-500/30 text-purple-300'
+  }
+
+  const getRoleLabel = (role) => {
+    return role === 'driver' ? 'Driver' : 'Passenger'
   }
 
   return (
@@ -117,8 +131,13 @@ export default function RideHistory() {
                 </h4>
                 <p className="text-sm text-gray-400">{ride.date} at {ride.time}</p>
               </div>
-              <div className={`px-3 py-1 rounded-full text-sm font-semibold border ${getStatusColor(ride.status)}`}>
-                {getStatusIcon(ride.status)} {ride.status}
+              <div className="flex flex-col gap-2 items-end">
+                <div className={`px-3 py-1 rounded-full text-sm font-semibold border ${getStatusColor(ride.status)}`}>
+                  {getStatusIcon(ride.status)} {ride.status}
+                </div>
+                <div className={`px-3 py-1 rounded-full text-sm font-semibold border ${getRoleColor(ride.role)}`}>
+                  {getRoleLabel(ride.role)}
+                </div>
               </div>
             </div>
 

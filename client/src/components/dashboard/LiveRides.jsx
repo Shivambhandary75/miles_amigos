@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react'
 import chairIcon from '../../assets/icons8-spectators-on-seats-50.png'
+import ConfirmationDialog from '../ConfirmationDialog'
 
 export default function LiveRides() {
   const [rides, setRides] = useState([])
+  const [showBookDialog, setShowBookDialog] = useState(false)
+  const [selectedRide, setSelectedRide] = useState(null)
+  const [isBooking, setIsBooking] = useState(false)
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -20,6 +24,21 @@ export default function LiveRides() {
 
     return () => clearInterval(interval)
   }, [])
+
+  const handleBookClick = (ride) => {
+    setSelectedRide(ride)
+    setShowBookDialog(true)
+  }
+
+  const confirmBookRide = () => {
+    setIsBooking(true)
+    setTimeout(() => {
+      setIsBooking(false)
+      setShowBookDialog(false)
+      alert(`Ride booked from ${selectedRide.from} to ${selectedRide.to}!`)
+      setSelectedRide(null)
+    }, 1000)
+  }
 
   return (
     <section>
@@ -51,13 +70,25 @@ export default function LiveRides() {
                   </span>
                 </div>
               </div>
-              <button className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-semibold transition">
+              <button onClick={() => handleBookClick(ride)} className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-semibold transition">
                 Book Now
               </button>
             </div>
           ))
         )}
       </div>
+
+      <ConfirmationDialog
+        isOpen={showBookDialog}
+        title="Confirm Ride Booking"
+        message={selectedRide ? `Book a ride from ${selectedRide.from} to ${selectedRide.to} with ${selectedRide.seats} available seat(s)?` : ''}
+        confirmText="Confirm Booking"
+        cancelText="Cancel"
+        isDangerous={false}
+        isLoading={isBooking}
+        onConfirm={confirmBookRide}
+        onCancel={() => setShowBookDialog(false)}
+      />
     </section>
   )
 }
