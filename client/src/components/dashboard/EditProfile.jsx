@@ -7,6 +7,17 @@ export default function EditProfile() {
   const [isEditMode, setIsEditMode] = useState(false)
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [showVerificationModal, setShowVerificationModal] = useState(false)
+  const [currentVerificationType, setCurrentVerificationType] = useState(null)
+  const [uploadedFiles, setUploadedFiles] = useState({
+    email: null,
+    phone: null,
+    id: null,
+    carLicense: null,
+    carRegistration: null,
+    carInsurance: null,
+  })
+  const [hasOwnCar, setHasOwnCar] = useState(false)
 
   const [originalProfile, setOriginalProfile] = useState({
     name: 'John Doe',
@@ -69,7 +80,56 @@ export default function EditProfile() {
   }
 
   const handleVerify = (type) => {
-    setVerifications(prev => ({ ...prev, [type]: !prev[type] }))
+    setCurrentVerificationType(type)
+    setShowVerificationModal(true)
+  }
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const fileName = file.name
+      setUploadedFiles(prev => ({ ...prev, [currentVerificationType]: fileName }))
+    }
+  }
+
+  const handleCompleteVerification = () => {
+    // Email and phone don't require file uploads
+    const requiresFileUpload = ['id', 'carLicense', 'carRegistration', 'carInsurance'].includes(currentVerificationType)
+    
+    if (requiresFileUpload && !uploadedFiles[currentVerificationType]) {
+      alert('Please upload a file first')
+      return
+    }
+    
+    setVerifications(prev => ({ ...prev, [currentVerificationType]: true }))
+    const verifyType = currentVerificationType.charAt(0).toUpperCase() + currentVerificationType.slice(1)
+    alert(`${verifyType} ${requiresFileUpload ? 'document' : 'address'} verified successfully!`)
+    setShowVerificationModal(false)
+    setCurrentVerificationType(null)
+  }
+
+  const getVerificationLabel = (type) => {
+    const labels = {
+      email: 'Email Address',
+      phone: 'Phone Number',
+      id: 'ID Verification',
+      carLicense: 'Driving License',
+      carRegistration: 'Car Registration',
+      carInsurance: 'Car Insurance',
+    }
+    return labels[type] || type
+  }
+
+  const getVerificationDescription = (type) => {
+    const descriptions = {
+      email: 'We will send a verification code to your email address',
+      phone: 'We will send a verification code to your phone number',
+      id: 'Upload a valid government ID (Aadhaar, Passport, or Driving License)',
+      carLicense: 'Upload a copy of your driving license',
+      carRegistration: 'Upload your vehicle registration certificate (RC)',
+      carInsurance: 'Upload your vehicle insurance policy document',
+    }
+    return descriptions[type] || 'Please complete the required verification'
   }
 
   return (
@@ -254,6 +314,65 @@ export default function EditProfile() {
             </div>
           </div>
 
+          {/* Own Car Section */}
+          {isEditMode && (
+            <div className="bg-yellow-500/10 border border-yellow-500/30 backdrop-blur-lg p-8 rounded-2xl">
+              <h3 className="text-xl font-bold text-white mb-4">Do you own a car?</h3>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={hasOwnCar}
+                  onChange={(e) => setHasOwnCar(e.target.checked)}
+                  className="w-5 h-5 cursor-pointer"
+                />
+                <span className="text-white font-medium">Yes, I own a car and want to verify it</span>
+              </label>
+
+              {hasOwnCar && (
+                <div className="mt-6 space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
+                    <div>
+                      <p className="text-white font-semibold">Driving License</p>
+                      <p className="text-sm text-gray-400">Upload your driving license copy</p>
+                    </div>
+                    <button
+                      onClick={() => handleVerify('carLicense')}
+                      className="px-4 py-2 rounded-lg font-semibold bg-blue-600 text-white hover:bg-blue-700 transition"
+                    >
+                      {uploadedFiles.carLicense ? '✓ Uploaded' : 'Upload'}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
+                    <div>
+                      <p className="text-white font-semibold">Car Registration (RC)</p>
+                      <p className="text-sm text-gray-400">Upload your vehicle registration certificate</p>
+                    </div>
+                    <button
+                      onClick={() => handleVerify('carRegistration')}
+                      className="px-4 py-2 rounded-lg font-semibold bg-blue-600 text-white hover:bg-blue-700 transition"
+                    >
+                      {uploadedFiles.carRegistration ? '✓ Uploaded' : 'Upload'}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
+                    <div>
+                      <p className="text-white font-semibold">Car Insurance</p>
+                      <p className="text-sm text-gray-400">Upload your vehicle insurance policy</p>
+                    </div>
+                    <button
+                      onClick={() => handleVerify('carInsurance')}
+                      className="px-4 py-2 rounded-lg font-semibold bg-blue-600 text-white hover:bg-blue-700 transition"
+                    >
+                      {uploadedFiles.carInsurance ? '✓ Uploaded' : 'Upload'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Preferences */}
           <div className="bg-white/5 backdrop-blur-lg p-8 rounded-2xl border border-white/10">
             <h3 className="text-xl font-bold text-white mb-6">Preferences</h3>
@@ -271,6 +390,94 @@ export default function EditProfile() {
           </div>
         </div>
       </div>
+
+      {/* Verification Modal */}
+      {showVerificationModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-gray-900 border-2 border-blue-500/50 rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-white">
+                {getVerificationLabel(currentVerificationType)} Verification
+              </h2>
+              <button
+                onClick={() => {
+                  setShowVerificationModal(false)
+                  setCurrentVerificationType(null)
+                }}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-gray-300 mb-6">
+              {getVerificationDescription(currentVerificationType)}
+            </p>
+
+            {['id', 'carLicense', 'carRegistration', 'carInsurance'].includes(currentVerificationType) ? (
+              // File upload for document verifications
+              <div className="space-y-4 mb-6">
+                <div className="border-2 border-dashed border-blue-500/30 rounded-lg p-8 text-center">
+                  <input
+                    type="file"
+                    id="verification-file"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    accept="image/*,.pdf,.doc,.docx"
+                  />
+                  <label htmlFor="verification-file" className="cursor-pointer">
+                    <div className="text-4xl mb-3">📄</div>
+                    <p className="text-white font-semibold mb-1">Choose File</p>
+                    <p className="text-sm text-gray-400">
+                      {uploadedFiles[currentVerificationType]
+                        ? `✓ File selected`
+                        : 'Click to browse or drag and drop'}
+                    </p>
+                  </label>
+                </div>
+
+                {currentVerificationType?.includes('car') && (
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 p-4 rounded-lg">
+                    <p className="text-yellow-300 text-sm">
+                      ℹ️ Required for car owners. Make sure documents are clear and legible.
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Code input for email/phone verifications
+              <div className="mb-6">
+                <input
+                  type="text"
+                  placeholder="Enter verification code"
+                  className="w-full bg-white/10 border border-white/20 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition placeholder-gray-500 text-center text-2xl tracking-widest"
+                  maxLength="6"
+                />
+                <p className="text-center text-gray-400 text-sm mt-3">Check your {currentVerificationType} for the code</p>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowVerificationModal(false)
+                  setCurrentVerificationType(null)
+                }}
+                className="flex-1 px-4 py-3 rounded-lg font-semibold text-white bg-gray-700 hover:bg-gray-600 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCompleteVerification}
+                className="flex-1 px-4 py-3 rounded-lg font-semibold text-white bg-blue-600 hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={['id', 'carLicense', 'carRegistration', 'carInsurance'].includes(currentVerificationType) && !uploadedFiles[currentVerificationType]}
+              >
+                {['id', 'carLicense', 'carRegistration', 'carInsurance'].includes(currentVerificationType) ? 'Verify & Upload' : 'Verify Code'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   )
 }
