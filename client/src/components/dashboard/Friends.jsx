@@ -14,7 +14,16 @@ export default function Friends() {
   ])
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
+  const [showBookingModal, setShowBookingModal] = useState(false)
   const [selectedFriend, setSelectedFriend] = useState(null)
+  const [bookingData, setBookingData] = useState({
+    from: '',
+    to: '',
+    date: '',
+    time: '',
+    notes: '',
+  })
+  const [showBookingConfirm, setShowBookingConfirm] = useState(false)
 
   const handleDeleteClick = (friend) => {
     setSelectedFriend(friend)
@@ -24,6 +33,32 @@ export default function Friends() {
   const handleViewProfile = (friend) => {
     setSelectedFriend(friend)
     setShowProfileModal(true)
+  }
+
+  const handleBookRide = (friend) => {
+    setSelectedFriend(friend)
+    setBookingData({ from: '', to: '', date: '', time: '', notes: '' })
+    setShowBookingModal(true)
+  }
+
+  const handleBookingInputChange = (e) => {
+    const { name, value } = e.target
+    setBookingData(prev => ({ ...prev, [name]: value }))
+  }
+
+  const handleConfirmBooking = () => {
+    if (!bookingData.from || !bookingData.to || !bookingData.date) {
+      alert('Please fill in all required fields')
+      return
+    }
+    setShowBookingConfirm(true)
+  }
+
+  const confirmRideBooking = () => {
+    setShowBookingConfirm(false)
+    setShowBookingModal(false)
+    alert(`Ride booked with ${selectedFriend.name}!\nFrom: ${bookingData.from}\nTo: ${bookingData.to}`)
+    setSelectedFriend(null)
   }
 
   const confirmDeleteFriend = () => {
@@ -70,7 +105,10 @@ export default function Friends() {
               <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition">
                 Message
               </button>
-              <button className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg font-medium transition">
+              <button 
+                onClick={() => handleBookRide(friend)}
+                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg font-medium transition"
+              >
                 Book Ride
               </button>
               <button 
@@ -103,6 +141,108 @@ export default function Friends() {
           setShowDeleteDialog(false)
           setSelectedFriend(null)
         }}
+      />
+
+      {/* Book Ride Modal */}
+      {showBookingModal && selectedFriend && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 border border-white/10 rounded-2xl p-8 max-w-md w-full max-h-96 overflow-y-auto">
+            <h2 className="text-2xl font-bold text-white mb-2">Book Ride with {selectedFriend.name}</h2>
+            <p className="text-gray-400 text-sm mb-6">⭐ {selectedFriend.rating} • {selectedFriend.rides} rides</p>
+
+            <div className="space-y-4">
+              {/* From Location */}
+              <div>
+                <label className="block text-white font-semibold mb-2">From</label>
+                <input
+                  type="text"
+                  name="from"
+                  value={bookingData.from}
+                  onChange={handleBookingInputChange}
+                  placeholder="Enter pickup location"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-400"
+                />
+              </div>
+
+              {/* To Location */}
+              <div>
+                <label className="block text-white font-semibold mb-2">To</label>
+                <input
+                  type="text"
+                  name="to"
+                  value={bookingData.to}
+                  onChange={handleBookingInputChange}
+                  placeholder="Enter destination"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-400"
+                />
+              </div>
+
+              {/* Date */}
+              <div>
+                <label className="block text-white font-semibold mb-2">Date</label>
+                <input
+                  type="date"
+                  name="date"
+                  value={bookingData.date}
+                  onChange={handleBookingInputChange}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-400"
+                />
+              </div>
+
+              {/* Time */}
+              <div>
+                <label className="block text-white font-semibold mb-2">Preferred Time</label>
+                <input
+                  type="time"
+                  name="time"
+                  value={bookingData.time}
+                  onChange={handleBookingInputChange}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-400"
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-white font-semibold mb-2">Additional Notes</label>
+                <textarea
+                  name="notes"
+                  value={bookingData.notes}
+                  onChange={handleBookingInputChange}
+                  placeholder="Any special requests or notes..."
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-400 resize-none h-20"
+                />
+              </div>
+            </div>
+
+            {/* Modal Buttons */}
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowBookingModal(false)}
+                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg font-medium transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmBooking}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition"
+              >
+                Request Ride
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Booking Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showBookingConfirm}
+        title="Confirm Ride Booking"
+        message={selectedFriend ? `Book a ride with ${selectedFriend.name}?\n\nFrom: ${bookingData.from}\nTo: ${bookingData.to}\nDate: ${bookingData.date}` : ''}
+        confirmText="Confirm Booking"
+        cancelText="Cancel"
+        isDangerous={false}
+        onConfirm={confirmRideBooking}
+        onCancel={() => setShowBookingConfirm(false)}
       />
 
       {/* View Profile Modal */}
