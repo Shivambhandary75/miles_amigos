@@ -1,44 +1,21 @@
 import { useState } from 'react'
 import ConfirmationDialog from '../ConfirmationDialog'
-import profileIcon from '../../assets/icons8-profile-50.png'
+import { useProfile } from '../../context/ProfileContext'
 import ratingIcon from '../../assets/icons8-rating-50.png'
 
 export default function EditProfile() {
+  const { profile, verifications, hasOwnCar, uploadedFiles, updateProfile, updateVerification, setCarOwnershipStatus, updateUploadedFiles } = useProfile()
+  
   const [isEditMode, setIsEditMode] = useState(false)
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [showVerificationModal, setShowVerificationModal] = useState(false)
   const [currentVerificationType, setCurrentVerificationType] = useState(null)
-  const [uploadedFiles, setUploadedFiles] = useState({
-    email: null,
-    phone: null,
-    id: null,
-    carLicense: null,
-    carRegistration: null,
-    carInsurance: null,
-  })
-  const [hasOwnCar, setHasOwnCar] = useState(false)
-
-  const [originalProfile, setOriginalProfile] = useState({
-    name: 'John Doe',
-    email: 'john@example.com',
-    phone: '+91 98765 43210',
-    bio: 'Love exploring new places and meeting new people!',
-    avatar: profileIcon,
-    rating: 4.8,
-  })
-
-  const [profile, setProfile] = useState(originalProfile)
-
-  const [verifications, setVerifications] = useState({
-    email: true,
-    phone: false,
-    id: true,
-  })
+  const [localProfile, setLocalProfile] = useState(profile)
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
-    setProfile(prev => ({ ...prev, [name]: value }))
+    setLocalProfile(prev => ({ ...prev, [name]: value }))
   }
 
   const handleAvatarChange = (e) => {
@@ -46,7 +23,7 @@ export default function EditProfile() {
     if (file) {
       const reader = new FileReader()
       reader.onload = (event) => {
-        setProfile(prev => ({
+        setLocalProfile(prev => ({
           ...prev,
           avatar: event.target?.result
         }))
@@ -56,11 +33,12 @@ export default function EditProfile() {
   }
 
   const handleEditClick = () => {
+    setLocalProfile(profile)
     setIsEditMode(true)
   }
 
   const handleCancel = () => {
-    setProfile(originalProfile)
+    setLocalProfile(profile)
     setIsEditMode(false)
   }
 
@@ -71,11 +49,11 @@ export default function EditProfile() {
   const confirmSave = async () => {
     setIsSaving(true)
     setTimeout(() => {
-      setOriginalProfile(profile)
+      updateProfile(localProfile)
       setIsSaving(false)
       setShowSaveDialog(false)
       setIsEditMode(false)
-      console.log('Profile saved:', profile)
+      console.log('Profile saved:', localProfile)
     }, 1000)
   }
 
@@ -88,7 +66,7 @@ export default function EditProfile() {
     const file = e.target.files?.[0]
     if (file) {
       const fileName = file.name
-      setUploadedFiles(prev => ({ ...prev, [currentVerificationType]: fileName }))
+      updateUploadedFiles(currentVerificationType, fileName)
     }
   }
 
@@ -101,7 +79,7 @@ export default function EditProfile() {
       return
     }
     
-    setVerifications(prev => ({ ...prev, [currentVerificationType]: true }))
+    updateVerification(currentVerificationType, true)
     const verifyType = currentVerificationType.charAt(0).toUpperCase() + currentVerificationType.slice(1)
     alert(`${verifyType} ${requiresFileUpload ? 'document' : 'address'} verified successfully!`)
     setShowVerificationModal(false)
@@ -131,6 +109,9 @@ export default function EditProfile() {
     }
     return descriptions[type] || 'Please complete the required verification'
   }
+
+  // Use localProfile in edit mode, otherwise use context profile
+  const displayProfile = isEditMode ? localProfile : profile
 
   return (
     <section>
@@ -167,7 +148,7 @@ export default function EditProfile() {
         {/* Avatar Section */}
         <div className="flex flex-col items-center">
           <div className="w-32 h-32 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center mb-6 shadow-lg">
-            <img src={profile.avatar} alt="Profile" className="w-28 h-28 object-cover rounded-full" />
+            <img src={displayProfile.avatar} alt="Profile" className="w-28 h-28 object-cover rounded-full" />
           </div>
           {isEditMode && (
             <>
@@ -188,7 +169,7 @@ export default function EditProfile() {
           )}
           <div className="text-gray-400 text-sm mt-4 flex items-center gap-2 justify-center">
             <img src={ratingIcon} alt="Rating" className="w-5 h-5" />
-            <span>{profile.rating} Rating</span>
+            <span>{displayProfile.rating} Rating</span>
           </div>
         </div>
 
@@ -204,13 +185,13 @@ export default function EditProfile() {
                   <input
                     type="text"
                     name="name"
-                    value={profile.name}
+                    value={displayProfile.name}
                     onChange={handleInputChange}
                     className="w-full bg-white/10 border border-white/20 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition"
                     placeholder="Your full name"
                   />
                 ) : (
-                  <p className="text-white text-lg">{profile.name}</p>
+                  <p className="text-white text-lg">{displayProfile.name}</p>
                 )}
               </div>
 
@@ -220,13 +201,13 @@ export default function EditProfile() {
                   <input
                     type="email"
                     name="email"
-                    value={profile.email}
+                    value={displayProfile.email}
                     onChange={handleInputChange}
                     className="w-full bg-white/10 border border-white/20 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition"
                     placeholder="Your Email ID"
                   />
                 ) : (
-                  <p className="text-white text-lg">{profile.email}</p>
+                  <p className="text-white text-lg">{displayProfile.email}</p>
                 )}
               </div>
 
@@ -236,13 +217,13 @@ export default function EditProfile() {
                   <input
                     type="tel"
                     name="phone"
-                    value={profile.phone}
+                    value={displayProfile.phone}
                     onChange={handleInputChange}
                     className="w-full bg-white/10 border border-white/20 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition"
                     placeholder="Your Phone Number"
                   />
                 ) : (
-                  <p className="text-white text-lg">{profile.phone}</p>
+                  <p className="text-white text-lg">{displayProfile.phone}</p>
                 )}
               </div>
 
@@ -251,14 +232,14 @@ export default function EditProfile() {
                 {isEditMode ? (
                   <textarea
                     name="bio"
-                    value={profile.bio}
+                    value={displayProfile.bio}
                     onChange={handleInputChange}
                     className="w-full bg-white/10 border border-white/20 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition resize-none"
                     placeholder="Tell us about yourself"
                     rows="3"
                   />
                 ) : (
-                  <p className="text-white text-lg">{profile.bio}</p>
+                  <p className="text-white text-lg">{displayProfile.bio}</p>
                 )}
               </div>
 
@@ -322,7 +303,7 @@ export default function EditProfile() {
                 <input
                   type="checkbox"
                   checked={hasOwnCar}
-                  onChange={(e) => setHasOwnCar(e.target.checked)}
+                  onChange={(e) => setCarOwnershipStatus(e.target.checked)}
                   className="w-5 h-5 cursor-pointer"
                 />
                 <span className="text-white font-medium">Yes, I own a car and want to verify it</span>
