@@ -1,15 +1,23 @@
 import { useState } from "react";
 import axios from "axios";
 import { useNavigate } from 'react-router-dom'
+import { useProfile } from '../context/ProfileContext'
 
 export default function Login({ switchToSignup }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate()
+  const { setProfileFromAuth } = useProfile()
 
   const handleLogin = async(e) => {
     e.preventDefault();
     
+    // Save email to profile context (username would come from backend)
+    setProfileFromAuth({
+      email: email,
+      username: email.split('@')[0] // Use part of email as username for now
+    })
+
     // For now, just redirect to dashboard
     navigate('/dashboard')
   };
