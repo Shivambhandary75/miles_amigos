@@ -50,6 +50,15 @@ export function ProfileProvider({ children }) {
     setUploadedFiles(prev => ({ ...prev, [type]: status }))
   }
 
+  // Set profile from auth (signup/login)
+  const setProfileFromAuth = (authData) => {
+    setProfile(prev => ({
+      ...prev,
+      name: authData.username || prev.name,
+      email: authData.email || prev.email,
+    }))
+  }
+
   // Get profile info
   const getProfile = () => profile
 
@@ -71,6 +80,7 @@ export function ProfileProvider({ children }) {
     updateVerification,
     setCarOwnershipStatus,
     updateUploadedFiles,
+    setProfileFromAuth,
     getProfile,
     getVerifications,
     getCarOwnershipStatus,

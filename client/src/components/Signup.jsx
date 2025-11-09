@@ -1,13 +1,15 @@
 import { useState } from "react";
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
+import { useProfile } from '../context/ProfileContext'
 
 export default function Signup({ switchToLogin }) {
-  const [username,setUsername]=useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const navigate = useNavigate()
+  const { setProfileFromAuth } = useProfile()
 
   const handleSignup = async(e) => {
     e.preventDefault();
@@ -15,6 +17,12 @@ export default function Signup({ switchToLogin }) {
       alert("Passwords do not match!");
       return;
     }
+
+    // Save email and username to profile context
+    setProfileFromAuth({
+      username: username,
+      email: email
+    })
 
     // For now, just redirect to dashboard
     navigate('/dashboard')
