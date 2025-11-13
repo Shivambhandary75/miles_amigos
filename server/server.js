@@ -2,11 +2,11 @@ const express = require('express')
 const dotenv = require('dotenv')
 const connectDB = require('./src/config/db')
 const userRoutes = require('./src/routes/userRoutes')
-
+const cors=require('cors')
 dotenv.config()
 
 const app = express()
-
+app.use(cors())
 // middlewares
 // capture raw body for debugging JSON parse errors
 app.use(express.json({
@@ -30,6 +30,9 @@ app.use((err, req, res, next) => {
 
 // routes
 app.use('/api/users', userRoutes)
+
+const rideRoutes = require('./src/routes/rideRoutes')
+app.use('/api/rides', rideRoutes)
 
 // connect to DB and start server
 const PORT = process.env.PORT || 5000

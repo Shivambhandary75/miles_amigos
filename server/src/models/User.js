@@ -11,11 +11,6 @@ const UserSchema = new mongoose.Schema({
         required: [true, "email is compulsory"],
         unique: true
     },
-    phone: {
-        type: String,
-        maxlength: [10, "The phone number should be of max 10 length"],
-        unique: true
-    },
     password: {
         type: String
     },
@@ -26,15 +21,15 @@ const UserSchema = new mongoose.Schema({
         default: 0
     },
 
-    GivenRides: {
+    GivenRides: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: "Ride"
-    },
+    }],
 
-    TakenRides: {
+    TakenRides: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: "traveller"
-    }
+        ref: "Ride"
+    }]
 
 }, {
     timestamps: true
