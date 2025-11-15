@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import info from '../../assets/icons8-info-50.png'
 import ratingIcon from '../../assets/icons8-rating-50.png'
+import MapLibreMap from '../MapLibreMap'
 
 export default function RideHistory() {
   const [filter, setFilter] = useState('all')
@@ -142,6 +143,18 @@ export default function RideHistory() {
           </button>
         ))}
       </div>
+
+      {/* Map View of Selected Ride */}
+      {selectedRide && (
+        <div className="mb-8 rounded-2xl overflow-hidden border border-white/10 shadow-lg" style={{ height: '400px' }}>
+          <MapLibreMap
+            startLocation={[77.5946, 12.9716]} // Default Bangalore center
+            endLocation={[77.7099, 13.1939]}   // Default Bangalore airport
+            showRoute={true}
+            zoom={12}
+          />
+        </div>
+      )}
 
       {/* Rides Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

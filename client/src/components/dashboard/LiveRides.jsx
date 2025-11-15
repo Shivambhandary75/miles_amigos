@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import chairIcon from '../../assets/icons8-spectators-on-seats-50.png'
+import MapLibreMap from '../MapLibreMap'
 import ConfirmationDialog from '../ConfirmationDialog'
 
 export default function LiveRides() {
@@ -44,6 +45,22 @@ export default function LiveRides() {
     <section>
       <div className="mb-10">
         <h1 className="text-4xl font-bold text-white mb-2"> Live Ride Feed</h1>
+      </div>
+
+      {/* Map View - Shows all active rides */}
+      <div className="mb-8 rounded-2xl overflow-hidden border border-white/10 shadow-lg" style={{ height: '450px' }}>
+        <MapLibreMap
+          startLocation={[77.5946, 12.9716]} // Bangalore center
+          endLocation={[77.7099, 13.1939]}   // Bangalore airport
+          showRoute={true}
+          zoom={12}
+          markers={rides.map(ride => ({
+            title: `${ride.from} → ${ride.to}`,
+            description: `${ride.seats} seats available`,
+            latitude: 12.9716 + (Math.random() - 0.5) * 0.1,
+            longitude: 77.5946 + (Math.random() - 0.5) * 0.1,
+          }))}
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

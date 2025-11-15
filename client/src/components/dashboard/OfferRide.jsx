@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import profileIcon from '../../assets/icons8-profile-50.png'
 import ratingIcon from '../../assets/icons8-rating-50.png'
+import MapLibreMap from '../MapLibreMap'
 import ConfirmationDialog from '../ConfirmationDialog'
 
 export default function OfferRide() {
@@ -214,6 +215,18 @@ export default function OfferRide() {
           </button>
         </form>
       </div>
+
+      {/* Map Preview - Shows route when both from and to are entered */}
+      {formData.from && formData.to && (
+        <div className="mt-8 rounded-2xl overflow-hidden border border-white/10 shadow-lg" style={{ height: '400px' }}>
+          <MapLibreMap
+            startLocation={[77.5946, 12.9716]} // Default Bangalore center - update with actual coordinates
+            endLocation={[77.7099, 13.1939]}   // Default Bangalore airport - update with actual coordinates
+            showRoute={true}
+            zoom={12}
+          />
+        </div>
+      )}
 
       {/* Request Details Modal */}
       {showRequestModal && selectedRequest && (
