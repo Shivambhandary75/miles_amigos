@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import ConfirmationDialog from '../ConfirmationDialog'
+import MapLibreMap from '../MapLibreMap'
 import searchIcon from '../../assets/icons8-search-50.png'
 import ratingIcon from '../../assets/icons8-rating-50.png'
 
@@ -132,6 +133,18 @@ export default function FindRide() {
           </button>
         </form>
       </div>
+
+      {/* Map Preview - Shows route when both from and to are entered */}
+      {from && to && (
+        <div className="mb-8 rounded-2xl overflow-hidden border border-white/10 shadow-lg" style={{ height: '400px' }}>
+          <MapLibreMap
+            startLocation={[77.5946, 12.9716]} // Default Bangalore center - update with actual coordinates
+            endLocation={[77.7099, 13.1939]}   // Default Bangalore airport - update with actual coordinates
+            showRoute={true}
+            zoom={12}
+          />
+        </div>
+      )}
 
       {/* Rides List */}
       <div>
