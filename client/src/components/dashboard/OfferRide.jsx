@@ -133,100 +133,137 @@ export default function OfferRide() {
         </div>
       )}
 
-      <div className="bg-white/5 backdrop-blur-lg p-8 rounded-2xl border border-white/10 max-w-2xl">
-        <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-white font-semibold mb-3">From Location</label>
-              <input 
-                type="text"
-                name="from"
-                value={formData.from}
-                onChange={handleInputChange}
-                placeholder="Enter pickup location" 
-                className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition" 
-              />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Form - Left Side */}
+        <div className="bg-white/5 backdrop-blur-lg p-8 rounded-2xl border border-white/10">
+          <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-white font-semibold mb-3">From Location</label>
+                <input 
+                  type="text"
+                  name="from"
+                  value={formData.from}
+                  onChange={handleInputChange}
+                  placeholder="Enter pickup location" 
+                  className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition" 
+                />
+              </div>
+              <div>
+                <label className="block text-white font-semibold mb-3">To Location</label>
+                <input 
+                  type="text"
+                  name="to"
+                  value={formData.to}
+                  onChange={handleInputChange}
+                  placeholder="Enter destination" 
+                  className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition" 
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-white font-semibold mb-3">To Location</label>
-              <input 
-                type="text"
-                name="to"
-                value={formData.to}
-                onChange={handleInputChange}
-                placeholder="Enter destination" 
-                className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition" 
-              />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-white font-semibold mb-3">Date & Time</label>
-              <input 
-                type="datetime-local"
-                name="datetime"
-                value={formData.datetime}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white focus:outline-none focus:ring-2 focus:ring-green-500 transition" 
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-white font-semibold mb-3">Date & Time</label>
+                <input 
+                  type="datetime-local"
+                  name="datetime"
+                  value={formData.datetime}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white focus:outline-none focus:ring-2 focus:ring-green-500 transition" 
+                />
+              </div>
+              <div>
+                <label className="block text-white font-semibold mb-3">Available Seats</label>
+                <input 
+                  type="number"
+                  name="seats"
+                  min="1" 
+                  max="7"
+                  value={formData.seats}
+                  onChange={handleInputChange}
+                  placeholder="1-7 seats" 
+                  className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition" 
+                />
+              </div>
             </div>
+
             <div>
-              <label className="block text-white font-semibold mb-3">Available Seats</label>
+              <label className="block text-white font-semibold mb-3">Price per Seat (₹)</label>
               <input 
                 type="number"
-                name="seats"
-                min="1" 
-                max="7"
-                value={formData.seats}
+                name="price"
+                value={formData.price}
                 onChange={handleInputChange}
-                placeholder="1-7 seats" 
+                placeholder="Enter price" 
                 className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition" 
               />
             </div>
-          </div>
 
-          <div>
-            <label className="block text-white font-semibold mb-3">Price per Seat (₹)</label>
-            <input 
-              type="number"
-              name="price"
-              value={formData.price}
-              onChange={handleInputChange}
-              placeholder="Enter price" 
-              className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition" 
-            />
-          </div>
+            <div>
+              <label className="block text-white font-semibold mb-3">Notes</label>
+              <textarea 
+                name="notes"
+                value={formData.notes}
+                onChange={handleInputChange}
+                placeholder="Add notes (music, pet-friendly, etc.)" 
+                rows="4"
+                className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition" 
+              />
+            </div>
 
-          <div>
-            <label className="block text-white font-semibold mb-3">Notes</label>
-            <textarea 
-              name="notes"
-              value={formData.notes}
-              onChange={handleInputChange}
-              placeholder="Add notes (music, pet-friendly, etc.)" 
-              rows="4"
-              className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition" 
-            />
-          </div>
-
-          <button type="submit" className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-4 rounded-lg font-bold text-lg transition-all hover:shadow-xl hover:shadow-green-500/50">
-             Post Your Ride
-          </button>
-        </form>
-      </div>
-
-      {/* Map Preview - Shows route when both from and to are entered */}
-      {formData.from && formData.to && (
-        <div className="mt-8 rounded-2xl overflow-hidden border border-white/10 shadow-lg" style={{ height: '400px' }}>
-          <MapLibreMap
-            startLocation={[77.5946, 12.9716]} // Default Bangalore center - update with actual coordinates
-            endLocation={[77.7099, 13.1939]}   // Default Bangalore airport - update with actual coordinates
-            showRoute={true}
-            zoom={12}
-          />
+            <button type="submit" className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-4 rounded-lg font-bold text-lg transition-all hover:shadow-xl hover:shadow-green-500/50">
+               Post Your Ride
+            </button>
+          </form>
         </div>
-      )}
+
+        {/* Map Sidebar - Right Side */}
+        <div>
+          <div className="bg-white/5 backdrop-blur-lg p-6 rounded-2xl border border-white/10 h-fit sticky top-8">
+            <h3 className="text-lg font-bold text-white mb-4">Route Preview</h3>
+            
+            <div className="rounded-lg overflow-hidden border border-white/10 mb-4" style={{ height: '400px' }}>
+              <MapLibreMap
+                startLocation={[77.5946, 12.9716]}
+                endLocation={[77.7099, 13.1939]}
+                showRoute={formData.from && formData.to}
+                zoom={12}
+              />
+            </div>
+
+            {/* Ride Details */}
+            {formData.from && formData.to && (
+              <div className="bg-white/5 p-4 rounded-lg space-y-3">
+                <div>
+                  <p className="text-xs text-gray-400 mb-1">From</p>
+                  <p className="text-white font-semibold text-sm">{formData.from}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-1">To</p>
+                  <p className="text-white font-semibold text-sm">{formData.to}</p>
+                </div>
+                {formData.datetime && (
+                  <div>
+                    <p className="text-xs text-gray-400 mb-1">When</p>
+                    <p className="text-white font-semibold text-sm">{formData.datetime}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs text-gray-400 mb-1">Seats & Price</p>
+                  <p className="text-white font-semibold text-sm">{formData.seats} seats @ ₹{formData.price || '0'}</p>
+                </div>
+              </div>
+            )}
+
+            {!formData.from && !formData.to && (
+              <div className="bg-green-500/10 border border-green-400/30 p-4 rounded-lg">
+                <p className="text-sm text-green-300"> Fill pickup and destination above to see the route.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Request Details Modal */}
       {showRequestModal && selectedRequest && (

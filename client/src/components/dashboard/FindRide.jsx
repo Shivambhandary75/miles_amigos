@@ -69,82 +69,115 @@ export default function FindRide() {
         <p className="text-gray-400">Search and book available rides</p>
       </div>
 
-      <div className="bg-white/5 backdrop-blur-lg p-8 rounded-2xl border border-white/10 mb-8 max-w-2xl">
-        <form className="flex flex-col gap-6" onSubmit={handleSearch}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-white font-semibold mb-3">From</label>
-              <input
-                type="text"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-                placeholder="Enter pickup location"
-                className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-              />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+        {/* Form - Left Side */}
+        <div className="bg-white/5 backdrop-blur-lg p-8 rounded-2xl border border-white/10">
+          <form className="flex flex-col gap-6" onSubmit={handleSearch}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-white font-semibold mb-3">From</label>
+                <input
+                  type="text"
+                  value={from}
+                  onChange={(e) => setFrom(e.target.value)}
+                  placeholder="Enter pickup location"
+                  className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                />
+              </div>
+              <div>
+                <label className="block text-white font-semibold mb-3">To</label>
+                <input
+                  type="text"
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                  placeholder="Enter destination"
+                  className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-white font-semibold mb-3">To</label>
-              <input
-                type="text"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-                placeholder="Enter destination"
-                className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-              />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <label className="block text-white font-semibold mb-3">Date</label>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-white font-semibold mb-3">Date</label>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                />
+              </div>
+              <div>
+                <label className="block text-white font-semibold mb-3">Passengers</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="7"
+                  value={passengers}
+                  onChange={(e) => setPassengers(Number(e.target.value))}
+                  placeholder="1-7 passengers"
+                  className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                />
+              </div>
+              <div>
+                <label className="block text-white font-semibold mb-3">Notes</label>
+                <input
+                  type="text"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Optional notes (e.g., luggage, stops)"
+                  className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-white font-semibold mb-3">Passengers</label>
-              <input
-                type="number"
-                min="1"
-                max="7"
-                value={passengers}
-                onChange={(e) => setPassengers(Number(e.target.value))}
-                placeholder="1-7 passengers"
-                className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-              />
-            </div>
-            <div>
-              <label className="block text-white font-semibold mb-3">Notes</label>
-              <input
-                type="text"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Optional notes (e.g., luggage, stops)"
-                className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-              />
-            </div>
-          </div>
 
-          <button className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-4 rounded-lg font-bold text-lg transition-all hover:shadow-xl hover:shadow-blue-500/50 flex items-center justify-center gap-2">
-            <img src={searchIcon} alt="Search" className="w-5 h-5" /> Search Rides
-          </button>
-        </form>
-      </div>
-
-      {/* Map Preview - Shows route when both from and to are entered */}
-      {from && to && (
-        <div className="mb-8 rounded-2xl overflow-hidden border border-white/10 shadow-lg" style={{ height: '400px' }}>
-          <MapLibreMap
-            startLocation={[77.5946, 12.9716]} // Default Bangalore center - update with actual coordinates
-            endLocation={[77.7099, 13.1939]}   // Default Bangalore airport - update with actual coordinates
-            showRoute={true}
-            zoom={12}
-          />
+            <button className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-4 rounded-lg font-bold text-lg transition-all hover:shadow-xl hover:shadow-blue-500/50 flex items-center justify-center gap-2">
+              <img src={searchIcon} alt="Search" className="w-5 h-5" /> Search Rides
+            </button>
+          </form>
         </div>
-      )}
+
+        {/* Map Sidebar - Right Side */}
+        <div>
+          <div className="bg-white/5 backdrop-blur-lg p-6 rounded-2xl border border-white/10 h-fit sticky top-8">
+            <h3 className="text-lg font-bold text-white mb-4"> Route Preview</h3>
+            
+            <div className="rounded-lg overflow-hidden border border-white/10 mb-4" style={{ height: '400px' }}>
+              <MapLibreMap
+                startLocation={[77.5946, 12.9716]}
+                endLocation={[77.7099, 13.1939]}
+                showRoute={from && to}
+                zoom={12}
+              />
+            </div>
+
+            {/* Location Info */}
+            {from && to && (
+              <div className="bg-white/5 p-4 rounded-lg space-y-3">
+                <div>
+                  <p className="text-xs text-gray-400 mb-1">From</p>
+                  <p className="text-white font-semibold text-sm">{from}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-1">To</p>
+                  <p className="text-white font-semibold text-sm">{to}</p>
+                </div>
+                {date && (
+                  <div>
+                    <p className="text-xs text-gray-400 mb-1">Date</p>
+                    <p className="text-white font-semibold text-sm">{date}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!from && !to && (
+              <div className="bg-blue-500/10 border border-blue-400/30 p-4 rounded-lg">
+                <p className="text-sm text-blue-300"> Enter pickup and destination above to see the route on the map.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Rides List */}
       <div>
