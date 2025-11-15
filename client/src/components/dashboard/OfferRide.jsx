@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import profileIcon from '../../assets/icons8-profile-50.png'
 import ratingIcon from '../../assets/icons8-rating-50.png'
-import MapLibreMap from '../MapLibreMap'
+import LeafletMapComponent from '../LeafletMapComponent'
 import ConfirmationDialog from '../ConfirmationDialog'
+import { geocodeAddress, searchLocations } from '../../utils/mapService'
 
 export default function OfferRide() {
   const [formData, setFormData] = useState({
@@ -23,6 +24,70 @@ export default function OfferRide() {
   const [showRequestModal, setShowRequestModal] = useState(false)
   const [priceData, setPriceData] = useState({ price: 0, isFree: false })
   const [showAcceptDialog, setShowAcceptDialog] = useState(false)
+  const [startCoords, setStartCoords] = useState(null)
+  const [endCoords, setEndCoords] = useState(null)
+  const [isGeocodingFrom, setIsGeocodingFrom] = useState(false)
+  const [isGeocodingTo, setIsGeocodingTo] = useState(false)
+  const [fromSuggestions, setFromSuggestions] = useState([])
+  const [toSuggestions, setToSuggestions] = useState([])
+
+  // Geocode "from" location
+  useEffect(() => {
+    if (formData.from.length > 2) {
+      setIsGeocodingFrom(true)
+      const timer = setTimeout(async () => {
+        try {
+          const suggestions = await searchLocations(formData.from, { limit: 5 })
+          setFromSuggestions(suggestions)
+          const result = await geocodeAddress(formData.from)
+          if (result) {
+            setStartCoords([result.longitude, result.latitude])
+          }
+        } catch (error) {
+          console.error('Error geocoding from location:', error)
+        } finally {
+          setIsGeocodingFrom(false)
+        }
+      }, 500) // Debounce 500ms
+      return () => clearTimeout(timer)
+    }
+    setFromSuggestions([])
+  }, [formData.from])
+
+  // Geocode "to" location
+  useEffect(() => {
+    if (formData.to.length > 2) {
+      setIsGeocodingTo(true)
+      const timer = setTimeout(async () => {
+        try {
+          const suggestions = await searchLocations(formData.to, { limit: 5 })
+          setToSuggestions(suggestions)
+          const result = await geocodeAddress(formData.to)
+          if (result) {
+            setEndCoords([result.longitude, result.latitude])
+          }
+        } catch (error) {
+          console.error('Error geocoding to location:', error)
+        } finally {
+          setIsGeocodingTo(false)
+        }
+      }, 500) // Debounce 500ms
+      return () => clearTimeout(timer)
+    }
+    setToSuggestions([])
+  }, [formData.to])
+
+  const handleSelectFrom = (sug) => {
+    setFormData(prev => ({ ...prev, from: sug.label }))
+    setFromSuggestions([])
+    setStartCoords([sug.longitude, sug.latitude])
+  }
+
+  const handleSelectTo = (sug) => {
+    setFormData(prev => ({ ...prev, to: sug.label }))
+    setToSuggestions([])
+    setEndCoords([sug.longitude, sug.latitude])
+  }
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -138,7 +203,7 @@ export default function OfferRide() {
         <div className="bg-white/5 backdrop-blur-lg p-8 rounded-2xl border border-white/10">
           <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
+              <div className="relative">
                 <label className="block text-white font-semibold mb-3">From Location</label>
                 <input 
                   type="text"
@@ -148,8 +213,19 @@ export default function OfferRide() {
                   placeholder="Enter pickup location" 
                   className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition" 
                 />
+                {fromSuggestions.length > 0 && (
+                  <ul className="absolute z-20 mt-1 w-full bg-gray-800 border border-white/10 rounded-lg max-h-56 overflow-auto">
+                    {fromSuggestions.map((s, i) => (
+                      <li key={i}>
+                        <button type="button" onClick={() => handleSelectFrom(s)} className="w-full text-left px-3 py-2 hover:bg-gray-700 text-sm text-white">
+                          {s.label}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-              <div>
+              <div className="relative">
                 <label className="block text-white font-semibold mb-3">To Location</label>
                 <input 
                   type="text"
@@ -159,6 +235,17 @@ export default function OfferRide() {
                   placeholder="Enter destination" 
                   className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition" 
                 />
+                {toSuggestions.length > 0 && (
+                  <ul className="absolute z-20 mt-1 w-full bg-gray-800 border border-white/10 rounded-lg max-h-56 overflow-auto">
+                    {toSuggestions.map((s, i) => (
+                      <li key={i}>
+                        <button type="button" onClick={() => handleSelectTo(s)} className="w-full text-left px-3 py-2 hover:bg-gray-700 text-sm text-white">
+                          {s.label}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
 
@@ -224,11 +311,11 @@ export default function OfferRide() {
             <h3 className="text-lg font-bold text-white mb-4">Route Preview</h3>
             
             <div className="rounded-lg overflow-hidden border border-white/10 mb-4" style={{ height: '400px' }}>
-              <MapLibreMap
-                startLocation={[77.5946, 12.9716]}
-                endLocation={[77.7099, 13.1939]}
-                showRoute={formData.from && formData.to}
-                zoom={12}
+              <LeafletMapComponent
+                startLocation={startCoords || null}
+                endLocation={endCoords || null}
+                showRoute={Boolean(startCoords && endCoords)}
+                zoom={13}
               />
             </div>
 

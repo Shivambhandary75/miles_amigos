@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import ConfirmationDialog from '../ConfirmationDialog'
-import MapLibreMap from '../MapLibreMap'
+import LeafletMapComponent from '../LeafletMapComponent'
 import searchIcon from '../../assets/icons8-search-50.png'
 import ratingIcon from '../../assets/icons8-rating-50.png'
+import { geocodeAddress, searchLocations } from '../../utils/mapService'
 
 export default function FindRide() {
   const mockRides = [
@@ -20,6 +21,71 @@ export default function FindRide() {
   const [showBookDialog, setShowBookDialog] = useState(false)
   const [selectedRide, setSelectedRide] = useState(null)
   const [isBooking, setIsBooking] = useState(false)
+  const [startCoords, setStartCoords] = useState(null)
+  const [endCoords, setEndCoords] = useState(null)
+  const [isGeocodingFrom, setIsGeocodingFrom] = useState(false)
+  const [isGeocodingTo, setIsGeocodingTo] = useState(false)
+  const [fromSuggestions, setFromSuggestions] = useState([])
+  const [toSuggestions, setToSuggestions] = useState([])
+
+  // Geocode "from" location
+  useEffect(() => {
+    if (from.length > 2) {
+      setIsGeocodingFrom(true)
+      const timer = setTimeout(async () => {
+        try {
+          // fetch suggestions for autocomplete
+          const suggestions = await searchLocations(from, { limit: 5 })
+          setFromSuggestions(suggestions)
+          const result = await geocodeAddress(from)
+          if (result) {
+            setStartCoords([result.longitude, result.latitude])
+          }
+        } catch (error) {
+          console.error('Error geocoding from location:', error)
+        } finally {
+          setIsGeocodingFrom(false)
+        }
+      }, 500) // Debounce 500ms
+      return () => clearTimeout(timer)
+    }
+    setFromSuggestions([])
+  }, [from])
+
+  // Geocode "to" location
+  useEffect(() => {
+    if (to.length > 2) {
+      setIsGeocodingTo(true)
+      const timer = setTimeout(async () => {
+        try {
+          const suggestions = await searchLocations(to, { limit: 5 })
+          setToSuggestions(suggestions)
+          const result = await geocodeAddress(to)
+          if (result) {
+            setEndCoords([result.longitude, result.latitude])
+          }
+        } catch (error) {
+          console.error('Error geocoding to location:', error)
+        } finally {
+          setIsGeocodingTo(false)
+        }
+      }, 500) // Debounce 500ms
+      return () => clearTimeout(timer)
+    }
+    setToSuggestions([])
+  }, [to])
+
+  const handleSelectFrom = (sug) => {
+    setFrom(sug.label)
+    setFromSuggestions([])
+    setStartCoords([sug.longitude, sug.latitude])
+  }
+
+  const handleSelectTo = (sug) => {
+    setTo(sug.label)
+    setToSuggestions([])
+    setEndCoords([sug.longitude, sug.latitude])
+  }
 
   const handleSearch = (e) => {
     e.preventDefault()
@@ -74,7 +140,7 @@ export default function FindRide() {
         <div className="bg-white/5 backdrop-blur-lg p-8 rounded-2xl border border-white/10">
           <form className="flex flex-col gap-6" onSubmit={handleSearch}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
+              <div className="relative">
                 <label className="block text-white font-semibold mb-3">From</label>
                 <input
                   type="text"
@@ -83,8 +149,19 @@ export default function FindRide() {
                   placeholder="Enter pickup location"
                   className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                 />
+                {fromSuggestions.length > 0 && (
+                  <ul className="absolute z-20 mt-1 w-full bg-gray-800 border border-white/10 rounded-lg max-h-56 overflow-auto">
+                    {fromSuggestions.map((s, i) => (
+                      <li key={i}>
+                        <button type="button" onClick={() => handleSelectFrom(s)} className="w-full text-left px-3 py-2 hover:bg-gray-700 text-sm text-white">
+                          {s.label}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-              <div>
+              <div className="relative">
                 <label className="block text-white font-semibold mb-3">To</label>
                 <input
                   type="text"
@@ -93,6 +170,17 @@ export default function FindRide() {
                   placeholder="Enter destination"
                   className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                 />
+                {toSuggestions.length > 0 && (
+                  <ul className="absolute z-20 mt-1 w-full bg-gray-800 border border-white/10 rounded-lg max-h-56 overflow-auto">
+                    {toSuggestions.map((s, i) => (
+                      <li key={i}>
+                        <button type="button" onClick={() => handleSelectTo(s)} className="w-full text-left px-3 py-2 hover:bg-gray-700 text-sm text-white">
+                          {s.label}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
 
@@ -142,11 +230,11 @@ export default function FindRide() {
             <h3 className="text-lg font-bold text-white mb-4"> Route Preview</h3>
             
             <div className="rounded-lg overflow-hidden border border-white/10 mb-4" style={{ height: '400px' }}>
-              <MapLibreMap
-                startLocation={[77.5946, 12.9716]}
-                endLocation={[77.7099, 13.1939]}
-                showRoute={from && to}
-                zoom={12}
+              <LeafletMapComponent
+                startLocation={startCoords || null}
+                endLocation={endCoords || null}
+                showRoute={Boolean(startCoords && endCoords)}
+                zoom={13}
               />
             </div>
 

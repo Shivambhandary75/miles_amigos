@@ -1,4 +1,4 @@
-import MapLibreMap from '../MapLibreMap'
+import LeafletMapComponent from '../LeafletMapComponent'
 
 export default function LiveMap() {
   return (
@@ -9,7 +9,7 @@ export default function LiveMap() {
       </div>
 
       <div className="bg-white/5 backdrop-blur-lg rounded-2xl overflow-hidden shadow-2xl shadow-blue-500/20 border border-white/10" style={{ height: '600px' }}>
-        <MapLibreMap
+        <LeafletMapComponent
           startLocation={[77.5946, 12.9716]}
           endLocation={[77.7099, 13.1939]}
           zoom={12}
