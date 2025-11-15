@@ -4,7 +4,6 @@ import ConfirmationDialog from '../components/ConfirmationDialog'
 import DashboardHome from '../components/dashboard/DashboardHome'
 import OfferRide from '../components/dashboard/OfferRide'
 import FindRide from '../components/dashboard/FindRide'
-import LiveRides from '../components/dashboard/LiveRides'
 import Messages from '../components/dashboard/Messages'
 import Friends from '../components/dashboard/Friends'
 import Communities from '../components/dashboard/Communities'
@@ -19,7 +18,6 @@ import profileIcon from '../assets/icons8-profile-50.png'
 import carIcon from '../assets/icons8-car-50.png'
 import searchIcon from '../assets/icons8-search-50.png'
 import mapIcon from '../assets/icons8-map-50.png'
-import liveIcon from '../assets/icons8-live-50.png'
 import historyIcon from '../assets/icons8-history-50.png'
 import messagesIcon from '../assets/icons8-messages-50.png'
 import friendsIcon from '../assets/icons8-friends-50.png'
@@ -120,12 +118,6 @@ export default function Dashboard() {
             onClick={() => handleNavigation('map')}
           />
           <SidebarButton
-            icon={liveIcon}
-            label="Live Rides"
-            active={activeSection === 'rideFeed'}
-            onClick={() => handleNavigation('rideFeed')}
-          />
-          <SidebarButton
             icon={historyIcon}
             label="Ride History"
             active={activeSection === 'rideHistory'}
@@ -209,7 +201,6 @@ export default function Dashboard() {
             {activeSection === 'dashboard' && <DashboardHome onNavigate={setActiveSection} />}
             {activeSection === 'offerRide' && <OfferRide />}
             {activeSection === 'findRide' && <FindRide />}
-            {activeSection === 'rideFeed' && <LiveRides />}
             {activeSection === 'messages' && <Messages />}
             {activeSection === 'friends' && <Friends />}
             {activeSection === 'communities' && <Communities />}
