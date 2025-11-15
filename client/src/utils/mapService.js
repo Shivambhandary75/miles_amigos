@@ -148,6 +148,46 @@ export async function geocodeAddress(address) {
 }
 
 /**
+ * Search locations with suggestions (using Nominatim)
+ * This is suitable for autocomplete dropdowns.
+ * @param {string} query Free text the user types
+ * @param {object} opts Optional settings: { limit?: number, countryCodes?: string, language?: string }
+ * @returns {Promise<Array<{label: string, latitude: number, longitude: number, raw: any}>>}
+ */
+export async function searchLocations(query, opts = {}) {
+  if (!query || query.trim().length < 2) return [];
+  const limit = Number.isFinite(opts.limit) ? opts.limit : 5;
+  const params = new URLSearchParams({
+    format: "json",
+    addressdetails: "1",
+    limit: String(limit),
+    q: query.trim(),
+  });
+  if (opts.countryCodes) params.set("countrycodes", opts.countryCodes);
+  if (opts.language) params.set("accept-language", opts.language);
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?${params.toString()}`;
+    const res = await fetch(url, {
+      headers: {
+        // Browsers set Referer automatically; setting UA is blocked. Keep header minimal.
+        Accept: "application/json",
+      },
+    });
+    if (!res.ok) throw new Error("Failed to fetch suggestions");
+    const data = await res.json();
+    return (data || []).map((item) => ({
+      label: item.display_name,
+      latitude: parseFloat(item.lat),
+      longitude: parseFloat(item.lon),
+      raw: item,
+    }));
+  } catch (err) {
+    console.error("Error fetching location suggestions:", err);
+    return [];
+  }
+}
+
+/**
  * Calculate straight-line distance between two points (in km)
  * @param {Array} point1 - [lat, lon]
  * @param {Array} point2 - [lat, lon]
@@ -203,6 +243,7 @@ export default {
   getReachableArea,
   reverseGeocode,
   geocodeAddress,
+  searchLocations,
   haversineDistance,
   getNearbyPOI,
   TILE_SERVERS,
