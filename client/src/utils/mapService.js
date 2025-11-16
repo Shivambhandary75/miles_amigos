@@ -119,18 +119,17 @@ export async function reverseGeocode(latitude, longitude) {
  */
 export async function geocodeAddress(address) {
   try {
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-        address
-      )}`
-    );
-
+    const params = new URLSearchParams({
+      q: address,
+      format: 'json',
+      limit: 1,
+      addressdetails: 1
+    });
+    const response = await fetch(`/api/geocode/search?${params.toString()}`);
     if (!response.ok) {
       throw new Error("Failed to geocode address");
     }
-
     const data = await response.json();
-
     if (data && data.length > 0) {
       const result = data[0];
       return {
@@ -139,7 +138,6 @@ export async function geocodeAddress(address) {
         longitude: parseFloat(result.lon),
       };
     }
-
     return null;
   } catch (error) {
     console.error("Error geocoding address:", error);
@@ -166,10 +164,9 @@ export async function searchLocations(query, opts = {}) {
   if (opts.countryCodes) params.set("countrycodes", opts.countryCodes);
   if (opts.language) params.set("accept-language", opts.language);
   try {
-    const url = `https://nominatim.openstreetmap.org/search?${params.toString()}`;
+    const url = `/api/geocode/search?${params.toString()}`;
     const res = await fetch(url, {
       headers: {
-        // Browsers set Referer automatically; setting UA is blocked. Keep header minimal.
         Accept: "application/json",
       },
     });

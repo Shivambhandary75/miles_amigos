@@ -1,5 +1,5 @@
 import { useState } from "react";
-import axios from "axios";
+import api, { setAuthToken } from '../utils/api'
 import { useNavigate } from 'react-router-dom'
 import { useProfile } from '../context/ProfileContext'
 
@@ -11,15 +11,22 @@ export default function Login({ switchToSignup }) {
 
   const handleLogin = async(e) => {
     e.preventDefault();
-    
-    // Save email to profile context (username would come from backend)
-    setProfileFromAuth({
-      email: email,
-      username: email.split('@')[0] // Use part of email as username for now
-    })
-
-    // For now, just redirect to dashboard
-    navigate('/dashboard')
+    try {
+      const body = { email, password }
+      const res = await api.post('/users/login', body)
+      if (res?.data?.success) {
+        const { token, user } = res.data
+        setAuthToken(token)
+        setProfileFromAuth({ username: user.name || user.email.split('@')[0], email: user.email })
+        navigate('/dashboard')
+      } else {
+        alert(res?.data?.message || 'Login failed')
+      }
+    } catch (err) {
+      console.error('Login error', err)
+      const msg = err?.response?.data?.message || err.message || 'Login failed'
+      alert(msg)
+    }
   };
 
   return (

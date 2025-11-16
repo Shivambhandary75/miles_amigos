@@ -1,9 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useContext } from 'react'
+import api from '../../utils/api'
 import profileIcon from '../../assets/icons8-profile-50.png'
 import ratingIcon from '../../assets/icons8-rating-50.png'
 import LeafletMapComponent from '../LeafletMapComponent'
 import ConfirmationDialog from '../ConfirmationDialog'
 import { geocodeAddress, searchLocations } from '../../utils/mapService'
+import { useApp } from '../../context/AppContext'
+import { getRoute } from "../../utils/getRoute";
+
 
 export default function OfferRide() {
   const [formData, setFormData] = useState({
@@ -30,11 +34,14 @@ export default function OfferRide() {
   const [isGeocodingTo, setIsGeocodingTo] = useState(false)
   const [fromSuggestions, setFromSuggestions] = useState([])
   const [toSuggestions, setToSuggestions] = useState([])
+  const { addRide } = useApp();
+  const [mapError, setMapError] = useState(null);
 
   // Geocode "from" location
   useEffect(() => {
     if (formData.from.length > 2) {
       setIsGeocodingFrom(true)
+      setMapError(null);
       const timer = setTimeout(async () => {
         try {
           const suggestions = await searchLocations(formData.from, { limit: 5 })
@@ -45,6 +52,7 @@ export default function OfferRide() {
           }
         } catch (error) {
           console.error('Error geocoding from location:', error)
+          setMapError('Could not fetch location. Please check your connection and try again.');
         } finally {
           setIsGeocodingFrom(false)
         }
@@ -58,6 +66,7 @@ export default function OfferRide() {
   useEffect(() => {
     if (formData.to.length > 2) {
       setIsGeocodingTo(true)
+      setMapError(null);
       const timer = setTimeout(async () => {
         try {
           const suggestions = await searchLocations(formData.to, { limit: 5 })
@@ -68,6 +77,7 @@ export default function OfferRide() {
           }
         } catch (error) {
           console.error('Error geocoding to location:', error)
+          setMapError('Could not fetch location. Please check your connection and try again.');
         } finally {
           setIsGeocodingTo(false)
         }
@@ -99,24 +109,71 @@ export default function OfferRide() {
     setShowConfirmDialog(true)
   }
 
-  const confirmPostRide = () => {
-    setIsPosting(true)
-    setTimeout(() => {
-      setIsPosting(false)
-      setShowConfirmDialog(false)
-      console.log('Ride posted:', formData)
-      // Reset form
-      setFormData({
-        from: '',
-        to: '',
-        datetime: '',
-        seats: 1,
-        price: '',
-        notes: '',
-      })
-      alert('Ride posted successfully!')
-    }, 1000)
+const confirmPostRide = async () => {
+  if (!startCoords || !endCoords) {
+    alert("Please select valid locations.");
+    return;
   }
+
+  setIsPosting(true);
+
+  try {
+    // 1. Fetch driver route polyline
+    const routePolyline = await getRoute(startCoords, endCoords);
+
+    if (!routePolyline) {
+      alert("Could not fetch route. Try again.");
+      return;
+    }
+
+    // 2. Build GeoJSON
+    const routeGeoJSON = {
+      type: "LineString",
+      coordinates: routePolyline
+    };
+
+    // 3. Send full ride data to backend
+    const res = await api.post('/rides', {
+      startLocation: {
+        name: formData.from,
+        lat: startCoords[1],
+        lng: startCoords[0]
+      },
+      endLocation: {
+        name: formData.to,
+        lat: endCoords[1],
+        lng: endCoords[0]
+      },
+      departureTime: formData.datetime,
+      availableSeats: formData.seats,
+      price: formData.price,
+      notes: formData.notes,
+      routePolyline,
+      routeGeoJSON
+    });
+
+    if (res.status === 201) {
+      addRide(res.data);
+      alert("Ride posted successfully!");
+
+      setFormData({
+        from: "",
+        to: "",
+        datetime: "",
+        seats: 1,
+        price: "",
+        notes: "",
+      });
+    }
+  } catch (error) {
+    console.error(error);
+    alert("Failed to post ride.");
+  } finally {
+    setIsPosting(false);
+    setShowConfirmDialog(false);
+  }
+};
+
 
   const handleViewRequest = (request) => {
     setSelectedRequest(request)
@@ -248,6 +305,8 @@ export default function OfferRide() {
                 )}
               </div>
             </div>
+
+            {mapError && <p className="text-red-400 text-sm">{mapError}</p>}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>

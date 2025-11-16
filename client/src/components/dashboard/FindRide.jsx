@@ -3,21 +3,19 @@ import ConfirmationDialog from '../ConfirmationDialog'
 import LeafletMapComponent from '../LeafletMapComponent'
 import searchIcon from '../../assets/icons8-search-50.png'
 import ratingIcon from '../../assets/icons8-rating-50.png'
-import { geocodeAddress, searchLocations } from '../../utils/mapService'
+import { geocodeAddress, searchLocations, haversineDistance } from '../../utils/mapService'
+import api from '../../utils/api'
 
 export default function FindRide() {
-  const mockRides = [
-    { id: 1, from: 'Downtown', to: 'Airport', seats: 3, price: '₹450', driver: 'John', rating: 4.8 },
-    { id: 2, from: 'Mall', to: 'Station', seats: 2, price: '₹120', driver: 'Sarah', rating: 4.9 },
-    { id: 3, from: 'Office', to: 'Gym', seats: 1, price: '₹80', driver: 'Mike', rating: 4.7 },
-  ]
+  // Rides fetched from backend
+  const [allRides, setAllRides] = useState([])
 
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [date, setDate] = useState('')
   const [passengers, setPassengers] = useState(1)
   const [notes, setNotes] = useState('')
-  const [results, setResults] = useState(mockRides)
+  const [results, setResults] = useState([])
   const [showBookDialog, setShowBookDialog] = useState(false)
   const [selectedRide, setSelectedRide] = useState(null)
   const [isBooking, setIsBooking] = useState(false)
@@ -27,6 +25,20 @@ export default function FindRide() {
   const [isGeocodingTo, setIsGeocodingTo] = useState(false)
   const [fromSuggestions, setFromSuggestions] = useState([])
   const [toSuggestions, setToSuggestions] = useState([])
+
+  // Fetch all rides from backend on mount
+  useEffect(() => {
+    async function fetchRides() {
+      try {
+        const res = await api.get('/rides')
+        setAllRides(res.data)
+        setResults(res.data)
+      } catch (err) {
+        console.error('Error fetching rides:', err)
+      }
+    }
+    fetchRides()
+  }, [])
 
   // Geocode "from" location
   useEffect(() => {
@@ -87,19 +99,55 @@ export default function FindRide() {
     setEndCoords([sug.longitude, sug.latitude])
   }
 
-  const handleSearch = (e) => {
-    e.preventDefault()
-    // Simple client-side filter (matches either from or to substrings)
-    const qFrom = from.trim().toLowerCase()
-    const qTo = to.trim().toLowerCase()
-    const filtered = mockRides.filter(r => {
-      const matchesFrom = !qFrom || r.from.toLowerCase().includes(qFrom)
-      const matchesTo = !qTo || r.to.toLowerCase().includes(qTo)
-      return matchesFrom && matchesTo
-    })
-    setResults(filtered)
-    console.log('Searching rides with', { from, to, date, passengers, notes })
+  // Filter rides by matching route (start/end within 2km)
+const handleSearch = async (e) => {
+  e.preventDefault();
+
+  if (!startCoords || !endCoords) {
+    alert("Please enter valid pickup and drop locations.");
+    return;
   }
+
+  try {
+    const res = await api.post('/rides/search', {
+      pickup: {
+        lat: startCoords[1],
+        lng: startCoords[0]
+      },
+      drop: {
+        lat: endCoords[1],
+        lng: endCoords[0]
+      }
+    });
+
+    setResults(res.data.matches);
+  } catch (err) {
+    console.error("Error searching rides:", err);
+    alert("Failed to search rides. Try again.");
+  }
+};
+
+
+  // Geocode all rides' start/end locations when rides are loaded
+  useEffect(() => {
+    async function geocodeRides() {
+      const ridesWithCoords = await Promise.all(
+        allRides.map(async r => {
+          let _startCoords = null, _endCoords = null
+          try {
+            const startRes = await geocodeAddress(r.startLocation)
+            if (startRes) _startCoords = [startRes.longitude, startRes.latitude]
+            const endRes = await geocodeAddress(r.endLocation)
+            if (endRes) _endCoords = [endRes.longitude, endRes.latitude]
+          } catch {}
+          return { ...r, _startCoords, _endCoords }
+        })
+      )
+      setAllRides(ridesWithCoords)
+      setResults(ridesWithCoords)
+    }
+    if (allRides.length > 0) geocodeRides()
+  }, [allRides.length])
 
   const handleBookClick = (ride) => {
     setSelectedRide(ride)
@@ -272,24 +320,41 @@ export default function FindRide() {
         <h2 className="text-2xl font-bold text-white mb-6">Available Rides</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {results.map((ride, idx) => (
-            <div key={idx} className="bg-white/5 backdrop-blur-lg p-6 rounded-xl border border-white/10 hover:border-blue-500/30 transition">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <p className="text-lg font-bold text-white">{ride.from} → {ride.to}</p>
-                  <p className="text-gray-400 text-sm">Driver: {ride.driver}</p>
-                </div>
-                <span className="text-2xl flex items-center gap-1">
-                  <img src={ratingIcon} alt="Rating" className="w-6 h-6" /> {ride.rating}
-                </span>
-              </div>
-              <div className="flex justify-between items-center py-4 border-t border-white/10">
-                <div className="flex gap-4">
-                  <span className="text-green-400 font-bold">{ride.price}</span>
-                  <span className="text-gray-400">{ride.seats} seats</span>
-                </div>
-                <button onClick={() => handleBookClick(ride)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition">Book</button>
-              </div>
-            </div>
+    <div key={idx} className="bg-white/5 backdrop-blur-lg p-6 rounded-xl border border-white/10 hover:border-blue-500/30 transition">
+  <div className="flex justify-between items-start mb-4">
+    <div>
+      <p className="text-lg font-bold text-white">
+        {ride.driver?.name}'s Ride
+      </p>
+      <p className="text-gray-400 text-sm">
+        Seats: {ride.availableSeats}
+      </p>
+      <p className="text-gray-400 text-sm">
+        Departure: {new Date(ride.departureTime).toLocaleString()}
+      </p>
+    </div>
+
+    <span className="text-2xl flex items-center gap-1">
+      <img src={ratingIcon} alt="Rating" className="w-6 h-6" />
+      {ride.driver?.Rating || "—"}
+    </span>
+  </div>
+
+  <div className="flex justify-between items-center py-4 border-t border-white/10">
+    <div className="flex gap-4">
+      <span className="text-green-400 font-bold">₹{ride.price}</span>
+      <span className="text-gray-400">{ride.availableSeats} seats</span>
+    </div>
+
+    <button
+      onClick={() => handleBookClick(ride)}
+      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition"
+    >
+      Book
+    </button>
+  </div>
+</div>
+
           ))}
         </div>
       </div>
