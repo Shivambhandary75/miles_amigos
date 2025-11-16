@@ -14,11 +14,35 @@ const UserSchema = new mongoose.Schema({
     password: {
         type: String
     },
+    phone: {
+        type: String,
+        default: ''
+    },
+    bio: {
+        type: String,
+        default: ''
+    },
+    avatar: {
+        type: String,
+        default: ''
+    },
     Rating: {
         type: Number,
         min: 0,
         max: 5,
         default: 0
+    },
+    verifications: {
+        email: { type: Boolean, default: false },
+        phone: { type: Boolean, default: false },
+        id: { type: Boolean, default: false },
+        carLicense: { type: Boolean, default: false },
+        carRegistration: { type: Boolean, default: false },
+        carInsurance: { type: Boolean, default: false }
+    },
+    hasOwnCar: {
+        type: Boolean,
+        default: false
     },
 
     GivenRides: [{
