@@ -7,6 +7,7 @@ const {
     joinRide,
     getUserRides
 } = require('../controllers/rideController');
+const { searchRides } = require("../controllers/rideSearchController");
 const { protect } = require('../middlewares/authMiddleware');
 
 // Routes
@@ -22,5 +23,6 @@ router.route('/:id')
 
 router.route('/:id/join')
     .post(protect, joinRide);
+router.post("/search",protect, searchRides);
 
 module.exports = router;

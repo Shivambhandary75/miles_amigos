@@ -6,8 +6,23 @@ const User = require('../models/User');
 // @access  Private
 const createRide = async (req, res) => {
     try {
-        const { startLocation, endLocation, departureTime, availableSeats, price } = req.body;
+        const {
+            startLocation,
+            endLocation,
+            departureTime,
+            availableSeats,
+            price,
+            notes,
+            routePolyline,
+            routeGeoJSON
+        } = req.body;
+
         const driver = req.user.id;
+
+        // Validate required fields
+        if (!startLocation || !endLocation || !routePolyline || !routeGeoJSON) {
+            return res.status(400).json({ message: "Missing route data" });
+        }
 
         const ride = new Ride({
             driver,
@@ -15,21 +30,27 @@ const createRide = async (req, res) => {
             endLocation,
             departureTime,
             availableSeats,
-            price
+            price,
+            notes,
+            routePolyline,
+            routeGeoJSON
         });
 
         const createdRide = await ride.save();
 
-        // Add ride to user's given rides
+        // Add ride to driver's GivenRides
         const user = await User.findById(driver);
         user.GivenRides.push(createdRide._id);
         await user.save();
 
         res.status(201).json(createdRide);
+
     } catch (error) {
+        console.error(error);
         res.status(500).json({ message: error.message });
     }
 };
+
 
 // @desc    Find available rides
 // @route   GET /api/rides
@@ -123,11 +144,28 @@ const joinRide = async (req, res) => {
 const getUserRides = async (req, res) => {
     try {
         const userId = req.user.id;
-        const user = await User.findById(userId).populate('GivenRides').populate('TakenRides');
+        const user = await User.findById(userId)
+            .populate({ path: 'GivenRides', populate: { path: 'driver', select: 'name Rating' } })
+            .populate({ path: 'TakenRides', populate: { path: 'driver', select: 'name Rating' } });
         if (user) {
+            // Format rides for frontend
+            const formatRide = (ride, role) => ({
+                id: ride._id,
+                from: ride.startLocation,
+                to: ride.endLocation,
+                date: ride.departureTime ? new Date(ride.departureTime).toLocaleDateString() : '',
+                time: ride.departureTime ? new Date(ride.departureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+                driver: ride.driver?.name || 'Unknown',
+                rating: ride.driver?.Rating || 0,
+                seats: ride.availableSeats,
+                fare: ride.price ? `₹${ride.price}` : '',
+                status: 'completed', // TODO: add real status if available
+                role
+            });
+            const givenRides = user.GivenRides.map(r => formatRide(r, 'driver'));
+            const takenRides = user.TakenRides.map(r => formatRide(r, 'passenger'));
             res.json({
-                givenRides: user.GivenRides,
-                takenRides: user.TakenRides
+                rides: [...givenRides, ...takenRides]
             });
         } else {
             res.status(404).json({ message: 'User not found' });

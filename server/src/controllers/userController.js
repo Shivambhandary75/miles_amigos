@@ -18,6 +18,8 @@ exports.Register = async (req, res) => {
     }
 
     const user = await User.create({ name, email, password })
+    // log created user id for quick verification (do not log sensitive fields)
+    console.log('User registered:', { id: user._id, email: user.email })
     const token = generateToken(user._id)
 
     return res.status(201).json({ success: true, user: { id: user._id, name: user.name, email: user.email }, token })
