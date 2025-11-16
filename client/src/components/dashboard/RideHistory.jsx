@@ -1,4 +1,39 @@
-import { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+
+// Simple error boundary for ride grid
+function RideGridErrorBoundary({ children }) {
+  const [error, setError] = useState(null);
+  if (error) {
+    return (
+      <div className="bg-red-100 text-red-700 p-6 rounded-xl text-center">
+        <h2 className="text-xl font-bold mb-2">Something went wrong rendering your rides.</h2>
+        <p>{error.message}</p>
+        <p className="text-sm mt-2">Try refreshing the page or check your ride data.</p>
+      </div>
+    );
+  }
+  return (
+    <ErrorCatcher setError={setError}>{children}</ErrorCatcher>
+  );
+}
+
+class ErrorCatcher extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+  componentDidCatch(error, info) {
+    if (this.props.setError) this.props.setError(error);
+  }
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
+}
+import api from '../../utils/api'
 import info from '../../assets/icons8-info-50.png'
 import ratingIcon from '../../assets/icons8-rating-50.png'
 import MapLibreMap from '../MapLibreMap'
@@ -11,60 +46,18 @@ export default function RideHistory() {
   const [userRating, setUserRating] = useState(0)
   const [ratingComment, setRatingComment] = useState('')
 
-  const rides = [
-    {
-      id: 1,
-      from: 'Downtown',
-      to: 'Airport',
-      date: 'Dec 10, 2024',
-      time: '2:30 PM',
-      driver: 'Sarah M.',
-      rating: 4.8,
-      seats: 3,
-      fare: '$28.50',
-      status: 'completed',
-      role: 'passenger',
-    },
-    {
-      id: 2,
-      from: 'City Center',
-      to: 'North Station',
-      date: 'Dec 8, 2024',
-      time: '10:15 AM',
-      driver: 'John D.',
-      rating: 4.5,
-      seats: 2,
-      fare: '$15.00',
-      status: 'completed',
-      role: 'driver',
-    },
-    {
-      id: 3,
-      from: 'Mall District',
-      to: 'Beach Road',
-      date: 'Dec 5, 2024',
-      time: '5:45 PM',
-      driver: 'Emma L.',
-      rating: 5.0,
-      seats: 4,
-      fare: '$22.75',
-      status: 'completed',
-      role: 'passenger',
-    },
-    {
-      id: 4,
-      from: 'Tech Park',
-      to: 'Downtown',
-      date: 'Dec 3, 2024',
-      time: '3:20 PM',
-      driver: 'Mike T.',
-      rating: 4.6,
-      seats: 1,
-      fare: '$18.00',
-      status: 'cancelled',
-      role: 'driver',
-    },
-  ]
+  const [rides, setRides] = useState([])
+  useEffect(() => {
+    async function fetchHistory() {
+      try {
+        const res = await api.get('/rides/history')
+        setRides(res.data.rides || [])
+      } catch (err) {
+        console.error('Error fetching ride history:', err)
+      }
+    }
+    fetchHistory()
+  }, [])
 
   const filteredRides = filter === 'all' 
     ? rides 
@@ -156,75 +149,99 @@ export default function RideHistory() {
         </div>
       )}
 
-      {/* Rides Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {filteredRides.map(ride => (
-          <div 
-            key={ride.id}
-            className="bg-white/5 backdrop-blur-lg p-6 rounded-2xl border border-white/10 hover:border-blue-500/30 transition group"
-          >
-            {/* Header with status */}
-            <div className="flex justify-between items-start mb-4">
-              <div className="flex-1">
-                <h4 className="text-lg font-bold text-white mb-1">
-                  {ride.from} → {ride.to}
-                </h4>
-                <p className="text-sm text-gray-400">{ride.date} at {ride.time}</p>
-              </div>
-              <div className="flex flex-col gap-2 items-end">
-                <div className={`px-3 py-1 rounded-full text-sm font-semibold border ${getStatusColor(ride.status)}`}>
-                  {getStatusIcon(ride.status)} {ride.status}
-                </div>
-                <div className={`px-3 py-1 rounded-full text-sm font-semibold border ${getRoleColor(ride.role)}`}>
-                  {getRoleLabel(ride.role)}
-                </div>
-              </div>
-            </div>
+      {/* Rides Grid with Error Boundary */}
+      <RideGridErrorBoundary>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {filteredRides.map(ride => {
+              // Safe fallbacks for all ride properties
+              // If from/to are objects (e.g., {name, lat, lng}), use their name or stringify
+              let from = ride?.from || 'Unknown';
+              let to = ride?.to || 'Unknown';
+              if (typeof from === 'object' && from !== null) {
+                from = from.name || JSON.stringify(from);
+              }
+              if (typeof to === 'object' && to !== null) {
+                to = to.name || JSON.stringify(to);
+              }
+              const date = ride?.date || 'N/A';
+              const time = ride?.time || 'N/A';
+              const status = ride?.status || 'pending';
+              const role = ride?.role || 'passenger';
+              const driver = ride?.driver || 'Unknown';
+              const rating = typeof ride?.rating === 'number' ? ride.rating : 'N/A';
+              const seats = typeof ride?.seats === 'number' ? ride.seats : 'N/A';
+              const fare = typeof ride?.fare === 'number' ? ride.fare : 'N/A';
+              const id = ride?.id || ride?._id || Math.random();
 
-            {/* Driver Info */}
-            <div className="bg-white/5 p-3 rounded-lg mb-4">
-              <p className="text-gray-300 text-sm flex items-center gap-2">
-                <span className="text-white font-semibold">{ride.driver}</span> · 
-                <img src={ratingIcon} alt="Rating" className="w-4 h-4" /> {ride.rating}
-              </p>
-            </div>
-
-            {/* Details Grid */}
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              <div className="bg-white/5 p-3 rounded-lg text-center">
-                <p className="text-xs text-gray-400 mb-1">Seats</p>
-                <p className="text-white font-bold">{ride.seats}</p>
-              </div>
-              <div className="bg-white/5 p-3 rounded-lg text-center">
-                <p className="text-xs text-gray-400 mb-1">Fare</p>
-                <p className="text-white font-bold">{ride.fare}</p>
-              </div>
-              <div className="bg-white/5 p-3 rounded-lg text-center">
-                <p className="text-xs text-gray-400 mb-1">Status</p>
-                <p className="text-white font-bold text-sm capitalize">{ride.status}</p>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-3">
-              <button 
-                onClick={() => handleViewDetails(ride)}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold transition flex items-center justify-center gap-2"
-              >
-                <img src={info} alt="Details" className="w-4 h-4" /> Details
-              </button>
-              {ride.status === 'completed' && (
-                <button 
-                  onClick={() => handleRateClick(ride)}
-                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg font-semibold transition flex items-center justify-center gap-2"
+              return (
+                <div 
+                  key={id}
+                  className="bg-white/5 backdrop-blur-lg p-6 rounded-2xl border border-white/10 hover:border-blue-500/30 transition group"
                 >
-                  <img src={ratingIcon} alt="Rate" className="w-4 h-4" /> Rate
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+                  {/* Header with status */}
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex-1">
+                      <h4 className="text-lg font-bold text-white mb-1">
+                        {from} → {to}
+                      </h4>
+                      <p className="text-sm text-gray-400">{date} at {time}</p>
+                    </div>
+                    <div className="flex flex-col gap-2 items-end">
+                      <div className={`px-3 py-1 rounded-full text-sm font-semibold border ${getStatusColor(status)}`}>
+                        {getStatusIcon(status)} {status}
+                      </div>
+                      <div className={`px-3 py-1 rounded-full text-sm font-semibold border ${getRoleColor(role)}`}>
+                        {getRoleLabel(role)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Driver Info */}
+                  <div className="bg-white/5 p-3 rounded-lg mb-4">
+                    <p className="text-gray-300 text-sm flex items-center gap-2">
+                      <span className="text-white font-semibold">{driver}</span> · 
+                      <img src={ratingIcon} alt="Rating" className="w-4 h-4" /> {rating}
+                    </p>
+                  </div>
+
+                  {/* Details Grid */}
+                  <div className="grid grid-cols-3 gap-3 mb-4">
+                    <div className="bg-white/5 p-3 rounded-lg text-center">
+                      <p className="text-xs text-gray-400 mb-1">Seats</p>
+                      <p className="text-white font-bold">{seats}</p>
+                    </div>
+                    <div className="bg-white/5 p-3 rounded-lg text-center">
+                      <p className="text-xs text-gray-400 mb-1">Fare</p>
+                      <p className="text-white font-bold">{fare}</p>
+                    </div>
+                    <div className="bg-white/5 p-3 rounded-lg text-center">
+                      <p className="text-xs text-gray-400 mb-1">Status</p>
+                      <p className="text-white font-bold text-sm capitalize">{status}</p>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => handleViewDetails(ride)}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold transition flex items-center justify-center gap-2"
+                    >
+                      <img src={info} alt="Details" className="w-4 h-4" /> Details
+                    </button>
+                    {status === 'completed' && (
+                      <button 
+                        onClick={() => handleRateClick(ride)}
+                        className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg font-semibold transition flex items-center justify-center gap-2"
+                      >
+                        <img src={ratingIcon} alt="Rate" className="w-4 h-4" /> Rate
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+      </RideGridErrorBoundary>
 
       {filteredRides.length === 0 && (
         <div className="text-center py-16">

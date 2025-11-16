@@ -1,5 +1,5 @@
 import { useState } from "react";
-import axios from 'axios'
+import api, { setAuthToken } from '../utils/api'
 import { useNavigate } from 'react-router-dom'
 import { useProfile } from '../context/ProfileContext'
 
@@ -17,15 +17,27 @@ export default function Signup({ switchToLogin }) {
       alert("Passwords do not match!");
       return;
     }
+    try {
+      const body = { name: username, email, password }
+      const res = await api.post('/users/register', body)
+      if (res?.data?.success) {
+        const { token, user } = res.data
+        // persist token and set default auth header
+        setAuthToken(token)
 
-    // Save email and username to profile context
-    setProfileFromAuth({
-      username: username,
-      email: email
-    })
+        // update profile context from backend user
+        setProfileFromAuth({ username: user.name, email: user.email })
 
-    // For now, just redirect to dashboard
-    navigate('/dashboard')
+        // navigate to dashboard
+        navigate('/dashboard')
+      } else {
+        alert(res?.data?.message || 'Registration failed')
+      }
+    } catch (err) {
+      console.error('Signup error', err)
+      const msg = err?.response?.data?.message || err.message || 'Sign up failed'
+      alert(msg)
+    }
   };
 
   return (

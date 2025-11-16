@@ -150,12 +150,18 @@ export function AppProvider({ children }) {
     setJoinedCommunities(prev => prev.filter(id => id !== communityId))
   }
 
+  // Add a ride to liveRides
+  const addRide = (ride) => {
+    setLiveRides(prev => [...prev, ride])
+  }
+
   const value = {
     bookings,
     addBooking,
     updateBookingStatus,
     liveRides,
     setLiveRides,
+    addRide,
     messages,
     addMessage,
     friends,
