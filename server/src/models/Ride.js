@@ -1,56 +1,82 @@
 const mongoose = require('mongoose');
 
+const LocationSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        required: true
+    },
+    lat: {
+        type: Number,
+        required: true
+    },
+    lng: {
+        type: Number,
+        required: true
+    }
+}, { _id: false }); // don't create separate _id for this subdocument
+
 const RideSchema = new mongoose.Schema({
     driver: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true
     },
-    passengers: [{
-        user: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'User'
-        },
-        startLocation: {
+
+    startLocation: {
+        type: LocationSchema,
+        required: true
+    },
+
+    endLocation: {
+        type: LocationSchema,
+        required: true
+    },
+
+    routePolyline: {
+        type: [[Number]], // [[lng, lat], [lng, lat], ...]
+        required: true
+    },
+
+    routeGeoJSON: {
+        type: {
             type: String,
-            required: true
+            enum: ['LineString'],
+            default: 'LineString'
         },
-        endLocation: {
-            type: String,
+        coordinates: {
+            type: [[Number]], // [[lng, lat], ...]
             required: true
         }
-    }],
-    startLocation: {
-        type: String,
-        required: true
     },
-    endLocation: {
-        type: String,
-        required: true
-    },
+
     departureTime: {
         type: Date,
         required: true
     },
+
     availableSeats: {
         type: Number,
-        required: true,
-        min: 0
+        required: true
     },
+
     price: {
         type: Number,
-        required: true,
-        min: 0
+        required: true
     },
+
+    notes: {
+        type: String,
+        default: ""
+    },
+
     status: {
         type: String,
         enum: ['scheduled', 'in-progress', 'completed', 'cancelled'],
         default: 'scheduled'
     }
-}, {
-    timestamps: true
-});
 
-const Ride = mongoose.model('Ride', RideSchema);
+}, { timestamps: true });
 
-module.exports = Ride;
+RideSchema.index({ routeGeoJSON: "2dsphere" });
+
+module.exports = mongoose.model('Ride', RideSchema);

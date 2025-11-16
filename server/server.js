@@ -9,15 +9,9 @@ const app = express()
 app.use(cors())
 // middlewares
 // capture raw body for debugging JSON parse errors
-app.use(express.json({
-    verify: (req, res, buf) => {
-        try {
-            req.rawBody = buf.toString();
-        } catch (e) {
-            req.rawBody = undefined;
-        }
-    }
-}))
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
+
 
 // log raw body when JSON parsing fails
 app.use((err, req, res, next) => {
@@ -31,8 +25,13 @@ app.use((err, req, res, next) => {
 // routes
 app.use('/api/users', userRoutes)
 
+
 const rideRoutes = require('./src/routes/rideRoutes')
 app.use('/api/rides', rideRoutes)
+
+// Geocoding proxy
+const geocodeRoutes = require('./src/routes/geocodeRoutes')
+app.use('/api/geocode', geocodeRoutes)
 
 // connect to DB and start server
 const PORT = process.env.PORT || 5000
