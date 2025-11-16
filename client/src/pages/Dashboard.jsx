@@ -4,11 +4,11 @@ import ConfirmationDialog from '../components/ConfirmationDialog'
 import DashboardHome from '../components/dashboard/DashboardHome'
 import OfferRide from '../components/dashboard/OfferRide'
 import FindRide from '../components/dashboard/FindRide'
-import Messages from '../components/dashboard/Messages'
+// import Messages from '../components/dashboard/Messages'
 import Friends from '../components/dashboard/Friends'
-import Communities from '../components/dashboard/Communities'
+// import Communities from '../components/dashboard/Communities'
 import Notifications from '../components/dashboard/Notifications'
-import Settings from '../components/dashboard/Settings'
+// import Settings from '../components/dashboard/Settings'
 import SafetyHelp from '../components/dashboard/SafetyHelp'
 import RideHistory from '../components/dashboard/RideHistory'
 import LiveMap from '../components/dashboard/LiveMap'
@@ -123,36 +123,36 @@ export default function Dashboard() {
             active={activeSection === 'rideHistory'}
             onClick={() => handleNavigation('rideHistory')}
           />
-          <SidebarButton
+          {/* <SidebarButton
             icon={messagesIcon}
             label="Messages"
             active={activeSection === 'messages'}
             onClick={() => handleNavigation('messages')}
-          />
+          /> */}
           <SidebarButton
             icon={friendsIcon}
             label="Friends"
             active={activeSection === 'friends'}
             onClick={() => handleNavigation('friends')}
           />
-          <SidebarButton
+          {/* <SidebarButton
             icon={communityIcon}
             label="Communities"
             active={activeSection === 'communities'}
             onClick={() => handleNavigation('communities')}
-          />
+          /> */}
           <SidebarButton
             icon={notificationIcon}
             label="Notifications"
             active={activeSection === 'notifications'}
             onClick={() => handleNavigation('notifications')}
           />
-          <SidebarButton
+          {/* <SidebarButton
             icon={settingsIcon}
             label="Settings"
             active={activeSection === 'settings'}
             onClick={() => handleNavigation('settings')}
-          />
+          /> */}
           <SidebarButton
             icon={safetyIcon}
             label="Safety"
@@ -201,11 +201,11 @@ export default function Dashboard() {
             {activeSection === 'dashboard' && <DashboardHome onNavigate={setActiveSection} />}
             {activeSection === 'offerRide' && <OfferRide />}
             {activeSection === 'findRide' && <FindRide />}
-            {activeSection === 'messages' && <Messages />}
+            {/* {activeSection === 'messages' && <Messages />} */}
             {activeSection === 'friends' && <Friends />}
-            {activeSection === 'communities' && <Communities />}
+            {/* {activeSection === 'communities' && <Communities />} */}
             {activeSection === 'notifications' && <Notifications />}
-            {activeSection === 'settings' && <Settings />}
+            {/* {activeSection === 'settings' && <Settings />} */}
             {activeSection === 'reportSafety' && <SafetyHelp />}
             {activeSection === 'rideHistory' && <RideHistory />}
             {activeSection === 'map' && <LiveMap />}

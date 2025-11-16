@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import carIcon from '../../assets/icons8-car-50.png'
 import searchIcon from '../../assets/icons8-search-50.png'
 import liveIcon from '../../assets/icons8-live-50.png'
@@ -6,13 +7,38 @@ import mapIcon from '../../assets/icons8-map-50.png'
 import wallet from "../../assets/icons8-rupee-50.png"
 import safetyIcon from '../../assets/icons8-safety-50.png'
 import siren from '../../assets/icons8-siren-50.png'
+import api from '../../utils/api'
 
 export default function DashboardHome({ onNavigate }) {
-  const stats = [
-    { icon: carIcon, label: 'Rides Offered', value: '12', color: 'from-green-500 to-green-600' },
-    { icon: searchIcon, label: 'Rides Taken', value: '8', color: 'from-green-500 to-green-600' },
-    { icon: wallet, label: 'Earnings', value: '₹540', color: 'from-green-500 to-green-600' },
-  ]
+  const [stats, setStats] = useState([
+    { icon: carIcon, label: 'Rides Offered', value: '0', color: 'from-green-500 to-green-600' },
+    { icon: searchIcon, label: 'Rides Taken', value: '0', color: 'from-green-500 to-green-600' },
+    { icon: wallet, label: 'Earnings', value: '00.00', color: 'from-green-500 to-green-600' },
+  ])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await api.get('/users/stats')
+        if (response.data.success) {
+          const { ridesOffered, ridesTaken, totalEarnings } = response.data.stats
+          setStats([
+            { icon: carIcon, label: 'Rides Offered', value: String(ridesOffered), color: 'from-green-500 to-green-600' },
+            { icon: searchIcon, label: 'Rides Taken', value: String(ridesTaken), color: 'from-green-500 to-green-600' },
+            { icon: wallet, label: 'Earnings', value: `₹${totalEarnings}`, color: 'from-green-500 to-green-600' },
+          ])
+        }
+      } catch (error) {
+        console.error('Error fetching user stats:', error)
+        // Keep loading placeholders on error
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchStats()
+  }, [])
 
   return (
     <section>
@@ -50,14 +76,8 @@ export default function DashboardHome({ onNavigate }) {
             <button onClick={() => onNavigate && onNavigate('findRide')} className="bg-gradient-to-br from-green-500 to-green-600 text-white py-4 px-4 rounded-xl font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2">
               <img src={searchIcon} alt="Find Ride" className="w-5 h-5" /> Find Ride
             </button>
-            <button onClick={() => onNavigate && onNavigate('messages')} className="bg-gradient-to-br from-green-500 to-green-600 text-white py-4 px-4 rounded-xl font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2">
-              <img src={messagesIcon} alt="Messages" className="w-5 h-5" /> Messages
-            </button>
             <button onClick={() => onNavigate && onNavigate('map')} className="bg-gradient-to-br from-green-500 to-green-600 text-white py-4 px-4 rounded-xl font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2">
               <img src={mapIcon} alt="Live Map" className="w-5 h-5" /> Live Map
-            </button>
-            <button onClick={() => onNavigate && onNavigate('rideFeed')} className="bg-gradient-to-br from-green-500 to-green-600 text-white py-4 px-4 rounded-xl font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2">
-              <img src={liveIcon} alt="Live Rides" className="w-5 h-5" /> Live Rides
             </button>
             <button onClick={() => onNavigate && onNavigate('reportSafety')} className="bg-gradient-to-br from-red-500 to-red-600 text-white py-4 px-4 rounded-xl font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2">
               <img src={siren} alt="Emergency" className="w-5 h-5" />  Emergency

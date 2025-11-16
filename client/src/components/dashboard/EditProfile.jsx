@@ -48,13 +48,21 @@ export default function EditProfile() {
 
   const confirmSave = async () => {
     setIsSaving(true)
-    setTimeout(() => {
-      updateProfile(localProfile)
+    try {
+      const result = await updateProfile(localProfile)
+      if (result && result.success) {
+        setIsEditMode(false)
+        alert('Profile updated successfully!')
+      } else {
+        alert('Failed to update profile. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error saving profile:', error)
+      alert('Failed to update profile. Please try again.')
+    } finally {
       setIsSaving(false)
       setShowSaveDialog(false)
-      setIsEditMode(false)
-      console.log('Profile saved:', localProfile)
-    }, 1000)
+    }
   }
 
   const handleVerify = (type) => {

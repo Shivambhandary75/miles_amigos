@@ -1,4 +1,5 @@
 import { createContext, useState, useContext, useEffect } from 'react'
+import api from '../utils/api'
 import profileIcon from '../assets/icons8-profile-50.png'
 
 const ProfileContext = createContext()
@@ -19,6 +20,39 @@ export function ProfileProvider({ children }) {
       rating: 4.8,
     }
   })
+
+  // Fetch profile from backend on mount
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await api.get('/users/profile')
+        if (response.data.success) {
+          const userData = response.data.user
+          setProfile({
+            name: userData.name,
+            email: userData.email,
+            phone: userData.phone || '',
+            bio: userData.bio || '',
+            avatar: userData.avatar || profileIcon,
+            rating: userData.Rating || 0,
+          })
+          if (userData.verifications) {
+            setVerifications(userData.verifications)
+          }
+          if (userData.hasOwnCar !== undefined) {
+            setHasOwnCar(userData.hasOwnCar)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error)
+      }
+    }
+    
+    const token = localStorage.getItem('authToken')
+    if (token) {
+      fetchProfile()
+    }
+  }, [])
 
   const [verifications, setVerifications] = useState(() => {
     const savedVerifications = localStorage.getItem('userVerifications')
@@ -73,8 +107,26 @@ export function ProfileProvider({ children }) {
   }, [uploadedFiles])
 
   // Update profile data
-  const updateProfile = (updates) => {
-    setProfile(prev => ({ ...prev, ...updates }))
+  const updateProfile = async (updates) => {
+    try {
+      const response = await api.put('/users/profile', {
+        name: updates.name,
+        email: updates.email,
+        phone: updates.phone,
+        bio: updates.bio,
+        avatar: updates.avatar,
+        verifications: verifications,
+        hasOwnCar: hasOwnCar
+      })
+      
+      if (response.data.success) {
+        setProfile(prev => ({ ...prev, ...updates }))
+        return { success: true }
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error)
+      return { success: false, error: error.message }
+    }
   }
 
   // Update verification status
