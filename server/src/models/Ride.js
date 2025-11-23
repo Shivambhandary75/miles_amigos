@@ -73,7 +73,38 @@ const RideSchema = new mongoose.Schema({
         type: String,
         enum: ['scheduled', 'in-progress', 'completed', 'cancelled'],
         default: 'scheduled'
-    }
+    },
+
+    passengers: [{
+        user: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: true
+        },
+        startLocation: {
+            type: LocationSchema,
+            required: true
+        },
+        endLocation: {
+            type: LocationSchema,
+            required: true
+        },
+        status: {
+            type: String,
+            enum: ['pending', 'accepted', 'rejected'],
+            default: 'pending'
+        },
+        rating: {
+            type: Number,
+            min: 1,
+            max: 5,
+            default: null
+        },
+        comment: {
+            type: String,
+            default: ''
+        }
+    }]
 
 }, { timestamps: true });
 

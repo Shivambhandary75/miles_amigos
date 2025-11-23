@@ -149,20 +149,61 @@ const handleSearch = async (e) => {
     if (allRides.length > 0) geocodeRides()
   }, [allRides.length])
 
-  const handleBookClick = (ride) => {
+  const handleBookClick = (ride) => {0
+    console.log('Selected ride object:', ride);
+    console.log('Ride _id:', ride._id);
+    console.log('Ride id:', ride.id);
+    console.log('All ride keys:', Object.keys(ride));
     setSelectedRide(ride)
     setShowBookDialog(true)
   }
 
-  const confirmBookRide = () => {
-    setIsBooking(true)
-    setTimeout(() => {
-      setIsBooking(false)
-      setShowBookDialog(false)
-      console.log('Ride booked:', selectedRide)
-      alert(`Booking confirmed with ${selectedRide.driver}!`)
-      setSelectedRide(null)
-    }, 1000)
+  const confirmBookRide = async () => {
+    if (!selectedRide) return;
+    console.log("selected ride ", selectedRide);
+    // Validate that coordinates are available
+    if (!startCoords || !endCoords) {
+      alert('Please enter valid pickup and drop locations.');
+      return;
+    }
+    
+    // Get the ride ID (Mongoose uses _id by default)
+    const rideId = selectedRide.rideId;
+    console.log("ride id is ", rideId);
+    if (!rideId) {
+      alert('Ride ID not found. Please try again.');
+      return;
+    }
+    
+    setIsBooking(true);
+    try {
+      // Send booking request to backend
+      const payload = {
+        startLocation: {
+          name: from,
+          lat: startCoords[1],
+          lng: startCoords[0]
+        },
+        endLocation: {
+          name: to,
+          lat: endCoords[1],
+          lng: endCoords[0]
+        }
+      };
+      console.log('Sending booking payload:', payload);
+      const res = await api.post(`/rides/${rideId}/join`, payload);
+      setIsBooking(false);
+      setShowBookDialog(false);
+      console.log('Ride booked:', res.data);
+      alert(`Booking confirmed with ${selectedRide.driver?.name || 'driver'}!`);
+      setSelectedRide(null);
+    } catch (err) {
+      setIsBooking(false);
+      console.error('Booking error:', err);
+      console.error('Error response:', err.response?.data);
+      const errorMsg = err.response?.data?.message || 'Failed to book ride. Please try again.';
+      alert(errorMsg);
+    }
   }
 
   return (
@@ -170,7 +211,7 @@ const handleSearch = async (e) => {
       <ConfirmationDialog
         isOpen={showBookDialog}
         title="Confirm Booking"
-        message={selectedRide ? `Book ride with ${selectedRide.driver} from ${selectedRide.from} to ${selectedRide.to} for ₹${selectedRide.price}?` : ''}
+        message={selectedRide ? `Book ride with ${selectedRide.driver.name} from "${from}" to "${to}" for ₹${selectedRide.price}?` : ''}
         confirmText="Book Now"
         cancelText="Cancel"
         isDangerous={false}

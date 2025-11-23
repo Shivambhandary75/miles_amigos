@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import api from '../../utils/api'
 import friendsIcon from '../../assets/icons8-friends-50.png'
 import profileIcon from '../../assets/icons8-profile-50.png'
 import ratingIcon from '../../assets/icons8-rating-50.png'
@@ -6,12 +7,8 @@ import carIcon from '../../assets/icons8-car-50.png'
 import ConfirmationDialog from '../ConfirmationDialog'
 
 export default function Friends() {
-  const [friends, setFriends] = useState([
-    { id: 1, name: 'Alice Johnson', rating: 4.9, rides: 23, status: 'Online', avatar: profileIcon },
-    { id: 2, name: 'Bob Smith', rating: 4.7, rides: 18, status: 'Offline', avatar: profileIcon },
-    { id: 3, name: 'Carol Davis', rating: 4.8, rides: 31, status: 'Online', avatar: profileIcon },
-    { id: 4, name: 'David Wilson', rating: 4.6, rides: 12, status: 'Away', avatar: profileIcon },
-  ])
+  const [friends, setFriends] = useState([])
+  const [loading, setLoading] = useState(true)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [showBookingModal, setShowBookingModal] = useState(false)
@@ -24,6 +21,24 @@ export default function Friends() {
     notes: '',
   })
   const [showBookingConfirm, setShowBookingConfirm] = useState(false)
+
+  useEffect(() => {
+    fetchFriends()
+  }, [])
+
+  const fetchFriends = async () => {
+    try {
+      setLoading(true)
+      const res = await api.get('/users/friends')
+      if (res.data && res.data.friends) {
+        setFriends(res.data.friends)
+      }
+    } catch (err) {
+      console.error('Error fetching friends:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleDeleteClick = (friend) => {
     setSelectedFriend(friend)
@@ -61,11 +76,18 @@ export default function Friends() {
     setSelectedFriend(null)
   }
 
-  const confirmDeleteFriend = () => {
-    setFriends(friends.filter(f => f.id !== selectedFriend.id))
-    setShowDeleteDialog(false)
-    alert(`${selectedFriend.name} has been removed from your friends`)
-    setSelectedFriend(null)
+  const confirmDeleteFriend = async () => {
+    if (!selectedFriend) return;
+    try {
+      await api.delete(`/users/friends/${selectedFriend._id || selectedFriend.id}`);
+      setFriends(friends.filter(f => (f._id || f.id) !== (selectedFriend._id || selectedFriend.id)));
+      setShowDeleteDialog(false);
+      alert(`${selectedFriend.name} has been removed from your friends`);
+      setSelectedFriend(null);
+    } catch (err) {
+      console.error('Error removing friend:', err);
+      alert('Failed to remove friend.');
+    }
   }
 
   return (
@@ -77,26 +99,36 @@ export default function Friends() {
         <p className="text-gray-400">Connect with your ride-sharing friends</p>
       </div>
 
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-gray-400">Loading friends...</div>
+        </div>
+      ) : friends.length === 0 ? (
+        <div className="text-center py-12 bg-white/5 rounded-2xl border border-white/10">
+          <div className="text-gray-400 mb-4">No friends yet</div>
+          <p className="text-gray-500 text-sm">Complete rides and rate your drivers to build your friends list!</p>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {friends.map((friend) => (
-          <div key={friend.id} className="bg-white/5 backdrop-blur-lg p-6 rounded-2xl border border-white/10 hover:border-purple-500/30 transition">
+          <div key={friend._id || friend.id} className="bg-white/5 backdrop-blur-lg p-6 rounded-2xl border border-white/10 hover:border-purple-500/30 transition">
             <div className="flex items-center gap-4 mb-4">
-              <img src={friend.avatar} alt={friend.name} className="w-16 h-16 rounded-full object-cover" />
+              <img src={friend.avatar || profileIcon} alt={friend.name} className="w-16 h-16 rounded-full object-cover" />
               <div className="flex-1">
                 <p className="text-white font-bold">{friend.name}</p>
-                <p className="text-sm text-gray-400">{friend.status}</p>
+                <p className="text-sm text-gray-400">Driver</p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4 py-4 border-t border-white/10">
               <div className="text-center">
                 <div className="flex items-center justify-center gap-1 text-2xl font-bold text-yellow-400 mb-1">
-                  <img src={ratingIcon} alt="Rating" className="w-5 h-5" /> {friend.rating}
+                  <img src={ratingIcon} alt="Rating" className="w-5 h-5" /> {(friend.rating || 0).toFixed(1)}
                 </div>
                 <p className="text-xs text-gray-400">Rating</p>
               </div>
               <div className="text-center">
                 <div className="flex items-center justify-center gap-1 text-2xl font-bold text-green-400 mb-1">
-                  <img src={carIcon} alt="Rides" className="w-5 h-5" /> {friend.rides}
+                  <img src={carIcon} alt="Rides" className="w-5 h-5" /> {friend.rides || 0}
                 </div>
                 <p className="text-xs text-gray-400">Rides</p>
               </div>
@@ -127,6 +159,7 @@ export default function Friends() {
           </div>
         ))}
       </div>
+      )}
 
       {/* Delete Friend Dialog */}
       <ConfirmationDialog

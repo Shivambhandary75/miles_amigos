@@ -7,6 +7,7 @@ import ConfirmationDialog from '../ConfirmationDialog'
 import { geocodeAddress, searchLocations } from '../../utils/mapService'
 import { useApp } from '../../context/AppContext'
 import { getRoute } from "../../utils/getRoute";
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 
 
 export default function OfferRide() {
@@ -20,10 +21,7 @@ export default function OfferRide() {
   })
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [isPosting, setIsPosting] = useState(false)
-  const [rideRequests, setRideRequests] = useState([
-    { id: 1, friendName: 'Alice Johnson', from: 'Downtown', to: 'Airport', date: 'Dec 12, 2024', time: '2:30 PM', rating: 4.9, avatar: profileIcon },
-    { id: 2, friendName: 'Bob Smith', from: 'City Center', to: 'Mall', date: 'Dec 13, 2024', time: '10:00 AM', rating: 4.7, avatar: profileIcon },
-  ])
+  const [rideRequests, setRideRequests] = useState([]) // Real ride requests
   const [selectedRequest, setSelectedRequest] = useState(null)
   const [showRequestModal, setShowRequestModal] = useState(false)
   const [priceData, setPriceData] = useState({ price: 0, isFree: false })
@@ -34,8 +32,24 @@ export default function OfferRide() {
   const [isGeocodingTo, setIsGeocodingTo] = useState(false)
   const [fromSuggestions, setFromSuggestions] = useState([])
   const [toSuggestions, setToSuggestions] = useState([])
-  const { addRide } = useApp();
+  const { setLiveRides } = useApp(); // Use setLiveRides from AppContext
   const [mapError, setMapError] = useState(null);
+  const navigate = useNavigate(); // Initialize useNavigate
+
+  // Fetch ride requests
+  useEffect(() => {
+    const fetchRideRequests = async () => {
+      try {
+        const res = await api.get('/rides/requests');
+        setRideRequests(res.data);
+      } catch (err) {
+        console.error('Error fetching ride requests:', err);
+      }
+    };
+    fetchRideRequests();
+    const intervalId = setInterval(fetchRideRequests, 15000); // Refresh every 15 seconds
+    return () => clearInterval(intervalId);
+  }, []);
 
   // Geocode "from" location
   useEffect(() => {
@@ -153,7 +167,10 @@ const confirmPostRide = async () => {
     });
 
     if (res.status === 201) {
-      addRide(res.data);
+      // Instead of addRide, re-fetch all live rides to ensure consistency
+      const updatedLiveRides = await api.get('/rides');
+      setLiveRides(updatedLiveRides.data);
+
       alert("Ride posted successfully!");
 
       setFormData({
@@ -164,6 +181,7 @@ const confirmPostRide = async () => {
         price: "",
         notes: "",
       });
+      navigate('/dashboard?section=map'); // Navigate to Live Map section
     }
   } catch (error) {
     console.error(error);
@@ -181,24 +199,48 @@ const confirmPostRide = async () => {
     setShowRequestModal(true)
   }
 
-  const handleAcceptRequest = () => {
-    setShowAcceptDialog(true)
+  const handleAcceptRequest = async () => {
+    if (!selectedRequest) return;
+    setShowAcceptDialog(true);
   }
 
-  const confirmAcceptRequest = () => {
-    setShowAcceptDialog(false)
-    setShowRequestModal(false)
-    setRideRequests(rideRequests.filter(r => r.id !== selectedRequest.id))
-    const priceText = priceData.isFree ? 'free' : `₹${priceData.price}`
-    alert(`Ride request from ${selectedRequest.friendName} accepted!\nPrice set: ${priceText}`)
-    setSelectedRequest(null)
+  const confirmAcceptRequest = async () => {
+    if (!selectedRequest) return;
+    setIsPosting(true); // Use isPosting for acceptance loading state
+    try {
+      await api.put(`/rides/${selectedRequest.rideId}/requests/${selectedRequest.passengerId}/accept`);
+      alert(`Ride request from ${selectedRequest.passengerName} accepted!`);
+      setShowAcceptDialog(false);
+      setShowRequestModal(false);
+      // Refresh ride requests
+      const res = await api.get('/rides/requests');
+      setRideRequests(res.data);
+      setSelectedRequest(null);
+    } catch (error) {
+      console.error('Error accepting ride request:', error);
+      alert('Failed to accept ride request.');
+    } finally {
+      setIsPosting(false);
+    }
   }
 
-  const handleRejectRequest = () => {
-    setShowRequestModal(false)
-    setRideRequests(rideRequests.filter(r => r.id !== selectedRequest.id))
-    alert(`Ride request from ${selectedRequest.friendName} rejected`)
-    setSelectedRequest(null)
+  const handleRejectRequest = async () => {
+    if (!selectedRequest) return;
+    setIsPosting(true); // Use isPosting for rejection loading state
+    try {
+      await api.put(`/rides/${selectedRequest.rideId}/requests/${selectedRequest.passengerId}/reject`);
+      alert(`Ride request from ${selectedRequest.passengerName} rejected.`);
+      setShowRequestModal(false);
+      // Refresh ride requests
+      const res = await api.get('/rides/requests');
+      setRideRequests(res.data);
+      setSelectedRequest(null);
+    } catch (error) {
+      console.error('Error rejecting ride request:', error);
+      alert('Failed to reject ride request.');
+    } finally {
+      setIsPosting(false);
+    }
   }
 
   return (
@@ -226,14 +268,14 @@ const confirmPostRide = async () => {
           <h2 className="text-2xl font-bold text-white mb-4">📬 Ride Requests ({rideRequests.length})</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {rideRequests.map(request => (
-              <div key={request.id} className="bg-white/5 p-4 rounded-xl border border-white/10 hover:border-blue-400/50 transition">
+              <div key={request.rideId + request.passengerId} className="bg-white/5 p-4 rounded-xl border border-white/10 hover:border-blue-400/50 transition">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <img src={request.avatar} alt={request.friendName} className="w-12 h-12 rounded-full object-cover" />
+                    <img src={profileIcon} alt={request.passengerName} className="w-12 h-12 rounded-full object-cover" />
                     <div>
-                      <p className="text-white font-bold">{request.friendName}</p>
+                      <p className="text-white font-bold">{request.passengerName}</p>
                       <p className="text-xs text-yellow-400 flex items-center gap-1">
-                        <img src={ratingIcon} alt="Rating" className="w-3 h-3" /> {request.rating}
+                        <img src={ratingIcon} alt="Rating" className="w-3 h-3" /> {request.passengerRating}
                       </p>
                     </div>
                   </div>
@@ -416,10 +458,10 @@ const confirmPostRide = async () => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-gray-800 border border-white/10 rounded-2xl p-8 max-w-md w-full">
             <div className="text-center mb-6">
-              <img src={selectedRequest.avatar} alt={selectedRequest.friendName} className="w-16 h-16 rounded-full mx-auto mb-4 object-cover" />
-              <h2 className="text-2xl font-bold text-white">{selectedRequest.friendName}</h2>
+              <img src={profileIcon} alt={selectedRequest.passengerName} className="w-16 h-16 rounded-full mx-auto mb-4 object-cover" />
+              <h2 className="text-2xl font-bold text-white">{selectedRequest.passengerName}</h2>
               <p className="text-yellow-400 text-sm flex items-center justify-center gap-1">
-                <img src={ratingIcon} alt="Rating" className="w-4 h-4" /> {selectedRequest.rating} rating
+                <img src={ratingIcon} alt="Rating" className="w-4 h-4" /> {selectedRequest.passengerRating} rating
               </p>
             </div>
 
@@ -438,49 +480,7 @@ const confirmPostRide = async () => {
               </div>
             </div>
 
-            {/* Pricing Section */}
-            <div className="mb-6 bg-white/5 p-4 rounded-lg">
-              <label className="block text-white font-semibold mb-3">Set Pricing</label>
-              
-              <div className="space-y-3">
-                {/* Free Option */}
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={priceData.isFree}
-                    onChange={() => setPriceData({ ...priceData, isFree: true })}
-                    className="w-4 h-4 cursor-pointer"
-                  />
-                  <span className="text-gray-300">Offer for Free 🎁</span>
-                </label>
-
-                {/* Paid Option */}
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={!priceData.isFree}
-                    onChange={() => setPriceData({ ...priceData, isFree: false })}
-                    className="w-4 h-4 cursor-pointer"
-                  />
-                  <span className="text-gray-300">Charge Money</span>
-                </label>
-
-                {/* Price Input */}
-                {!priceData.isFree && (
-                  <div className="ml-7 mt-2">
-                    <input
-                      type="number"
-                      min="0"
-                      value={priceData.price}
-                      onChange={(e) => setPriceData({ ...priceData, price: parseFloat(e.target.value) || 0 })}
-                      placeholder="Enter price (₹)"
-                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-400 text-sm"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
+            {/* Pricing Section - Removed as price is set by driver when offering ride */}
             {/* Action Buttons */}
             <div className="space-y-2">
               <button
@@ -504,10 +504,11 @@ const confirmPostRide = async () => {
       <ConfirmationDialog
         isOpen={showAcceptDialog}
         title="Accept Ride Request"
-        message={selectedRequest ? `Accept ride request from ${selectedRequest.friendName}?\n\n${selectedRequest.from} → ${selectedRequest.to}\n${priceData.isFree ? 'Price: Free 🎁' : `Price: ₹${priceData.price}`}` : ''}
+        message={selectedRequest ? `Accept ride request from ${selectedRequest.passengerName}?\n\n${selectedRequest.from} → ${selectedRequest.to}` : ''}
         confirmText="Accept"
         cancelText="Cancel"
         isDangerous={false}
+        isLoading={isPosting}
         onConfirm={confirmAcceptRequest}
         onCancel={() => setShowAcceptDialog(false)}
       />

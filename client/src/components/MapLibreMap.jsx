@@ -93,51 +93,55 @@ export default function MapLibreMap({
     if (!map.current || !showRoute || !startLocation || !endLocation) return
 
     const fetchAndDisplayRoute = async () => {
-      const route = await getRoute(startLocation, endLocation)
+      try {
+        const route = await getRoute(startLocation, endLocation)
 
-      if (route) {
-        setRouteGeoJSON(route.geometry)
-        setRouteInfo({
-          distance: route.distance,
-          duration: route.duration,
-        })
-
-        if (onRouteChange) {
-          onRouteChange(route)
-        }
-
-        // Add route source
-        if (map.current.getSource('route')) {
-          map.current.getSource('route').setData(route.geometry)
-        } else {
-          map.current.addSource('route', {
-            type: 'geojson',
-            data: route.geometry,
+        if (route && map.current) { // Check if map still exists
+          setRouteGeoJSON(route.geometry)
+          setRouteInfo({
+            distance: route.distance,
+            duration: route.duration,
           })
 
-          map.current.addLayer({
-            id: 'route',
-            type: 'line',
-            source: 'route',
-            layout: {
-              'line-join': 'round',
-              'line-cap': 'round',
-            },
-            paint: {
-              'line-color': '#0ea5e9',
-              'line-width': 4,
-            },
-          })
+          if (onRouteChange) {
+            onRouteChange(route)
+          }
+
+          // Add route source
+          if (map.current.getSource('route')) {
+            map.current.getSource('route').setData(route.geometry)
+          } else {
+            map.current.addSource('route', {
+              type: 'geojson',
+              data: route.geometry,
+            })
+
+            map.current.addLayer({
+              id: 'route',
+              type: 'line',
+              source: 'route',
+              layout: {
+                'line-join': 'round',
+                'line-cap': 'round',
+              },
+              paint: {
+                'line-color': '#0ea5e9',
+                'line-width': 4,
+              },
+            })
+          }
+
+          // Fit bounds to route
+          const coordinates = route.coordinates
+          const bounds = coordinates.reduce(
+            (bounds, coord) => bounds.extend(coord),
+            new maplibregl.LngLatBounds(coordinates[0], coordinates[0])
+          )
+
+          map.current.fitBounds(bounds, { padding: 50 })
         }
-
-        // Fit bounds to route
-        const coordinates = route.coordinates
-        const bounds = coordinates.reduce(
-          (bounds, coord) => bounds.extend(coord),
-          new maplibregl.LngLatBounds(coordinates[0], coordinates[0])
-        )
-
-        map.current.fitBounds(bounds, { padding: 50 })
+      } catch (err) {
+        console.error('Error displaying route:', err)
       }
     }
 
