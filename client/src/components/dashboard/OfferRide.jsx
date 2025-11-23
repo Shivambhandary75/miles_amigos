@@ -124,21 +124,37 @@ export default function OfferRide() {
   }
 
 const confirmPostRide = async () => {
+  console.log('========================================');
+  console.log('🚗 [OFFER RIDE] Starting ride posting...');
+  console.log('========================================');
+  
   if (!startCoords || !endCoords) {
+    console.error('❌ [OFFER RIDE] Missing coordinates:', { startCoords, endCoords });
     alert("Please select valid locations.");
     return;
   }
+
+  console.log('📍 [OFFER RIDE] Coordinates obtained:');
+  console.log(`  From: [${startCoords[0]}, ${startCoords[1]}] - ${formData.from}`);
+  console.log(`  To: [${endCoords[0]}, ${endCoords[1]}] - ${formData.to}`);
 
   setIsPosting(true);
 
   try {
     // 1. Fetch driver route polyline
+    console.log('🗺️ [OFFER RIDE] Fetching route polyline...');
     const routePolyline = await getRoute(startCoords, endCoords);
 
     if (!routePolyline) {
+      console.error('❌ [OFFER RIDE] Failed to fetch route');
       alert("Could not fetch route. Try again.");
       return;
     }
+
+    console.log('✅ [OFFER RIDE] Route polyline obtained:');
+    console.log(`  Waypoints: ${routePolyline.length}`);
+    console.log(`  First point: [${routePolyline[0][0]}, ${routePolyline[0][1]}]`);
+    console.log(`  Last point: [${routePolyline[routePolyline.length-1][0]}, ${routePolyline[routePolyline.length-1][1]}]`);
 
     // 2. Build GeoJSON
     const routeGeoJSON = {
@@ -146,8 +162,8 @@ const confirmPostRide = async () => {
       coordinates: routePolyline
     };
 
-    // 3. Send full ride data to backend
-    const res = await api.post('/rides', {
+    // 3. Build ride data
+    const rideData = {
       startLocation: {
         name: formData.from,
         lat: startCoords[1],
@@ -164,11 +180,33 @@ const confirmPostRide = async () => {
       notes: formData.notes,
       routePolyline,
       routeGeoJSON
-    });
+    };
+
+    console.log('📤 [OFFER RIDE] Sending ride data to server:');
+    console.log(`  From: ${rideData.startLocation.name}`);
+    console.log(`  From Coords: [${rideData.startLocation.lng}, ${rideData.startLocation.lat}]`);
+    console.log(`  To: ${rideData.endLocation.name}`);
+    console.log(`  To Coords: [${rideData.endLocation.lng}, ${rideData.endLocation.lat}]`);
+    console.log(`  Date: ${rideData.departureTime}`);
+    console.log(`  Seats: ${rideData.availableSeats}`);
+    console.log(`  Price: ₹${rideData.price}`);
+    console.log(`  Route points: ${routePolyline.length}`);
+
+    // 4. Send full ride data to backend
+    const res = await api.post('/rides', rideData);
+
+    console.log('✅ [OFFER RIDE] Response received from server:');
+    console.log(`  Status: ${res.status}`);
+    console.log(`  Ride ID: ${res.data._id}`);
 
     if (res.status === 201) {
+      console.log('🎉 [OFFER RIDE] Ride created successfully!');
+      
       // Instead of addRide, re-fetch all live rides to ensure consistency
+      console.log('🔄 [OFFER RIDE] Refreshing live rides list...');
       const updatedLiveRides = await api.get('/rides');
+      console.log(`✅ [OFFER RIDE] Live rides refreshed. Total rides: ${updatedLiveRides.data.length}`);
+      
       setLiveRides(updatedLiveRides.data);
 
       alert("Ride posted successfully!");
@@ -181,14 +219,23 @@ const confirmPostRide = async () => {
         price: "",
         notes: "",
       });
+      console.log('📋 [OFFER RIDE] Form cleared and navigating to map...');
       navigate('/dashboard?section=map'); // Navigate to Live Map section
+    } else {
+      console.error(`❌ [OFFER RIDE] Unexpected status code: ${res.status}`);
+      alert("Failed to post ride.");
     }
   } catch (error) {
-    console.error(error);
+    console.error('❌ [OFFER RIDE] Error during ride posting:');
+    console.error(`  Error message: ${error.message}`);
+    console.error(`  Error details:`, error.response?.data || error);
     alert("Failed to post ride.");
   } finally {
     setIsPosting(false);
     setShowConfirmDialog(false);
+    console.log('========================================');
+    console.log('🏁 [OFFER RIDE] Ride posting process ended');
+    console.log('========================================');
   }
 };
 

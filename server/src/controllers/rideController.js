@@ -20,10 +20,29 @@ const createRide = async (req, res) => {
 
         const driver = req.user.id;
 
+        console.log('========================================');
+        console.log('🚗 [CREATE RIDE] Received ride creation request');
+        console.log('========================================');
+        console.log(`Driver ID: ${driver}`);
+        console.log(`Start Location: ${startLocation?.name} [${startLocation?.lng}, ${startLocation?.lat}]`);
+        console.log(`End Location: ${endLocation?.name} [${endLocation?.lng}, ${endLocation?.lat}]`);
+        console.log(`Departure Time: ${departureTime}`);
+        console.log(`Available Seats: ${availableSeats}`);
+        console.log(`Price: ₹${price}`);
+        console.log(`Notes: ${notes || 'None'}`);
+        console.log(`Route Polyline Points: ${routePolyline?.length || 0}`);
+
         // Validate required fields
         if (!startLocation || !endLocation || !routePolyline || !routeGeoJSON) {
+            console.error('❌ [CREATE RIDE] Validation failed - Missing required fields');
+            console.error(`  startLocation: ${startLocation ? 'Present' : 'Missing'}`);
+            console.error(`  endLocation: ${endLocation ? 'Present' : 'Missing'}`);
+            console.error(`  routePolyline: ${routePolyline ? 'Present' : 'Missing'}`);
+            console.error(`  routeGeoJSON: ${routeGeoJSON ? 'Present' : 'Missing'}`);
             return res.status(400).json({ message: "Missing route data" });
         }
+
+        console.log('✅ [CREATE RIDE] All required fields present');
 
         const ride = new Ride({
             driver,
@@ -37,16 +56,38 @@ const createRide = async (req, res) => {
             routeGeoJSON
         });
 
+        console.log('💾 [CREATE RIDE] Creating ride document in database...');
         const createdRide = await ride.save();
 
+        console.log(`✅ [CREATE RIDE] Ride document created:`);
+        console.log(`  Ride ID: ${createdRide._id}`);
+        console.log(`  Status: ${createdRide.status}`);
+
         // Add ride to driver's GivenRides
+        console.log(`👤 [CREATE RIDE] Updating driver user record...`);
         const user = await User.findById(driver);
+        if (!user) {
+            console.error(`❌ [CREATE RIDE] Driver user not found: ${driver}`);
+            return res.status(404).json({ message: "Driver user not found" });
+        }
+
         user.GivenRides.push(createdRide._id);
         await user.save();
+        console.log(`✅ [CREATE RIDE] Driver user updated:`);
+        console.log(`  Total GivenRides: ${user.GivenRides.length}`);
+
+        console.log('========================================');
+        console.log('🎉 [CREATE RIDE] Ride successfully created and returned');
+        console.log('========================================');
 
         res.status(201).json(createdRide);
 
     } catch (error) {
+        console.error('========================================');
+        console.error('❌ [CREATE RIDE] Error occurred');
+        console.error('========================================');
+        console.error(`Error message: ${error.message}`);
+        console.error(`Error stack:`, error.stack);
         console.error(error);
         res.status(500).json({ message: error.message });
     }
@@ -312,12 +353,18 @@ const getRideHistory = async (req, res) => {
         const user = await User.findById(userId)
             .populate({
                 path: 'GivenRides',
-                populate: { path: 'driver', select: 'name Rating' },
+                populate: [
+                    { path: 'driver', select: 'name Rating' },
+                    { path: 'passengers.user', select: 'name' }
+                ],
                 select: 'status startLocation endLocation departureTime availableSeats price passengers'
             })
             .populate({
                 path: 'TakenRides',
-                populate: { path: 'driver', select: 'name Rating' },
+                populate: [
+                    { path: 'driver', select: 'name Rating' },
+                    { path: 'passengers.user', select: 'name' }
+                ],
                 select: 'status startLocation endLocation departureTime availableSeats price passengers'
             });
 

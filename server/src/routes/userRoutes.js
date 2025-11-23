@@ -9,6 +9,11 @@ router.post('/register', Register)
 // POST /api/users/login
 router.post('/login', Login)
 
+// GET /api/users/me (protected) - Get current user ID
+router.get('/me', protect, (req, res) => {
+    res.json({ _id: req.user.id, email: req.user.email, name: req.user.name })
+})
+
 // GET /api/users/profile (protected)
 // PUT /api/users/profile (protected)
 router.route('/profile')

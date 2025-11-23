@@ -103,12 +103,24 @@ export default function FindRide() {
 const handleSearch = async (e) => {
   e.preventDefault();
 
+  console.log('\n========================================');
+  console.log('🔍 [FIND RIDE] Starting search...');
+  console.log('========================================');
+
   if (!startCoords || !endCoords) {
+    console.error('❌ [FIND RIDE] Missing coordinates');
     alert("Please enter valid pickup and drop locations.");
     return;
   }
 
+  console.log('📍 [FIND RIDE] Search parameters:');
+  console.log(`  From: ${from}`);
+  console.log(`  From Coords: [${startCoords[0]}, ${startCoords[1]}]`);
+  console.log(`  To: ${to}`);
+  console.log(`  To Coords: [${endCoords[0]}, ${endCoords[1]}]`);
+
   try {
+    console.log('📤 [FIND RIDE] Sending search request to server...');
     const res = await api.post('/rides/search', {
       pickup: {
         lat: startCoords[1],
@@ -120,9 +132,29 @@ const handleSearch = async (e) => {
       }
     });
 
-    setResults(res.data.matches);
+    console.log('✅ [FIND RIDE] Response received:');
+    console.log(`  Total matches: ${res.data.matches?.length || 0}`);
+    
+    if (res.data.matches && res.data.matches.length > 0) {
+      console.log('🚗 [FIND RIDE] Matched rides:');
+      res.data.matches.forEach((ride, idx) => {
+        console.log(`  ${idx + 1}. Ride ID: ${ride._id || ride.rideId}`);
+        console.log(`     Driver: ${ride.driver?.name}`);
+        console.log(`     From: ${ride.startLocation?.name} [${ride.startLocation?.lng}, ${ride.startLocation?.lat}]`);
+        console.log(`     To: ${ride.endLocation?.name} [${ride.endLocation?.lng}, ${ride.endLocation?.lat}]`);
+        console.log(`     Seats: ${ride.availableSeats}`);
+        console.log(`     Price: ₹${ride.price}`);
+      });
+    } else {
+      console.log('⚠️  [FIND RIDE] No rides found matching search criteria');
+    }
+
+    setResults(res.data.matches || []);
+    console.log('========================================\n');
   } catch (err) {
-    console.error("Error searching rides:", err);
+    console.error('❌ [FIND RIDE] Error searching rides:');
+    console.error('  Error:', err.message);
+    console.error('  Response:', err.response?.data);
     alert("Failed to search rides. Try again.");
   }
 };
@@ -149,11 +181,17 @@ const handleSearch = async (e) => {
     if (allRides.length > 0) geocodeRides()
   }, [allRides.length])
 
-  const handleBookClick = (ride) => {0
-    console.log('Selected ride object:', ride);
-    console.log('Ride _id:', ride._id);
-    console.log('Ride id:', ride.id);
-    console.log('All ride keys:', Object.keys(ride));
+  const handleBookClick = (ride) => {
+    console.log('\n========================================');
+    console.log('📋 [BOOK RIDE] Ride selected for booking');
+    console.log('========================================');
+    console.log('Ride Object:');
+    console.log(JSON.stringify(ride, null, 2));
+    console.log('Ride IDs:', {
+      '_id': ride._id,
+      'rideId': ride.rideId,
+      'id': ride.id
+    });
     setSelectedRide(ride)
     setShowBookDialog(true)
   }
