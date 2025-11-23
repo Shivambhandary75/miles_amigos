@@ -7,6 +7,7 @@ import MapIntegrationTest from "./components/MapIntegrationTest";
 import { ProfileProvider } from "./context/ProfileContext";
 import { AppProvider } from "./context/AppContext";
 import PageTransition from "./components/PageTransition";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
   const location = useLocation();
@@ -18,8 +19,22 @@ function App() {
           <Routes location={location} key={location.pathname}>
             <Route path="/" element={<PageTransition><LandingPage /></PageTransition>} />
             <Route path="/auth" element={<PageTransition><AuthPage /></PageTransition>} />
-            <Route path="/dashboard" element={<PageTransition><Dashboard /></PageTransition>} />
-            <Route path="/test/maps" element={<PageTransition><MapIntegrationTest /></PageTransition>} />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <PageTransition><Dashboard /></PageTransition>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/test/maps"
+              element={
+                <ProtectedRoute>
+                  <PageTransition><MapIntegrationTest /></PageTransition>
+                </ProtectedRoute>
+              }
+            />
           </Routes>
         </AnimatePresence>
       </AppProvider>
