@@ -50,6 +50,15 @@ exports.searchRides = async (req, res) => {
         const dropPoint = [drop.lng, drop.lat];
 
         console.log('🗄️  [SEARCH] Fetching rides from database...');
+        
+        // First, check ALL rides in the database
+        const allRidesInDB = await Ride.find({}).populate("driver", "name Rating email");
+        console.log(`📊 [SEARCH] Total rides in database: ${allRidesInDB.length}`);
+        allRidesInDB.forEach((ride, idx) => {
+            const hasPolyline = ride.routePolyline && ride.routePolyline.length > 0;
+            console.log(`  ${idx + 1}. Departure: ${new Date(ride.departureTime).toISOString()}, Available Seats: ${ride.availableSeats}, Has Route: ${hasPolyline}, Status: ${ride.status}`);
+        });
+        
         // Fetch all future rides with seats (including the newly created ones)
         const rides = await Ride.find({
             departureTime: { $gte: new Date() },
@@ -57,7 +66,14 @@ exports.searchRides = async (req, res) => {
             status: { $ne: 'cancelled' }
         }).populate("driver", "name Rating email");
 
-        console.log(`✅ [SEARCH] Found ${rides.length} available rides`);
+        console.log(`✅ [SEARCH] Found ${rides.length} available rides matching criteria`);
+        
+        if (rides.length === 0) {
+            console.log('⚠️  [SEARCH] No rides matching criteria');
+            console.log('   Rides with past dates:');
+            const pastRides = allRidesInDB.filter(r => r.departureTime < new Date());
+            console.log(`   Found ${pastRides.length} rides with past dates`);
+        }
         console.log('\n📋 [SEARCH] Ride details:');
         rides.forEach((ride, idx) => {
             console.log(`  ${idx + 1}. ID: ${ride._id}`);
@@ -65,6 +81,9 @@ exports.searchRides = async (req, res) => {
             console.log(`     startLocation: ${JSON.stringify(ride.startLocation)}`);
             console.log(`     endLocation: ${JSON.stringify(ride.endLocation)}`);
             console.log(`     Route points: ${ride.routePolyline?.length || 0}`);
+            if (ride.routePolyline?.length === 0) {
+                console.log(`     ⚠️  EMPTY ROUTE POLYLINE!`);
+            }
             console.log(`     Departure: ${ride.departureTime}`);
             console.log(`     Seats: ${ride.availableSeats}`);
             console.log(`     Status: ${ride.status}`);
@@ -83,6 +102,7 @@ exports.searchRides = async (req, res) => {
 
             if (!route || route.length === 0) {
                 console.log(`  ❌ No route polyline found`);
+                console.log(`     Route value: ${JSON.stringify(route)}`);
                 continue;
             }
 

@@ -133,7 +133,9 @@ const handleSearch = async (e) => {
     });
 
     console.log('✅ [FIND RIDE] Response received:');
+    console.log(`  Status: ${res.status}`);
     console.log(`  Total matches: ${res.data.matches?.length || 0}`);
+    console.log(`  Full response:`, res.data);
     
     if (res.data.matches && res.data.matches.length > 0) {
       console.log('🚗 [FIND RIDE] Matched rides:');
@@ -147,6 +149,7 @@ const handleSearch = async (e) => {
       });
     } else {
       console.log('⚠️  [FIND RIDE] No rides found matching search criteria');
+      console.log('   Server response:', JSON.stringify(res.data, null, 2));
     }
 
     setResults(res.data.matches || []);
@@ -154,7 +157,9 @@ const handleSearch = async (e) => {
   } catch (err) {
     console.error('❌ [FIND RIDE] Error searching rides:');
     console.error('  Error:', err.message);
-    console.error('  Response:', err.response?.data);
+    console.error('  Status:', err.response?.status);
+    console.error('  Response data:', err.response?.data);
+    console.error('  Full error:', err);
     alert("Failed to search rides. Try again.");
   }
 };
