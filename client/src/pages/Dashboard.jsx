@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ConfirmationDialog from '../components/ConfirmationDialog'
 import DashboardHome from '../components/dashboard/DashboardHome'
 import OfferRide from '../components/dashboard/OfferRide'
 import FindRide from '../components/dashboard/FindRide'
+import InProgressRide from '../components/dashboard/InProgressRide' // Import InProgressRide
 // import Messages from '../components/dashboard/Messages'
 import Friends from '../components/dashboard/Friends'
 // import Communities from '../components/dashboard/Communities'
@@ -11,8 +12,9 @@ import Notifications from '../components/dashboard/Notifications'
 // import Settings from '../components/dashboard/Settings'
 import SafetyHelp from '../components/dashboard/SafetyHelp'
 import RideHistory from '../components/dashboard/RideHistory'
-import LiveMap from '../components/dashboard/LiveMap'
+import LiveMap from '../components/dashboard/LiveMapNew'
 import EditProfile from '../components/dashboard/EditProfile'
+import UpcomingRides from '../components/dashboard/UpcomingRides'
 import dashboardIcon from '../assets/icons8-dashboard-50.png'
 import profileIcon from '../assets/icons8-profile-50.png'
 import carIcon from '../assets/icons8-car-50.png'
@@ -26,12 +28,36 @@ import notificationIcon from '../assets/icons8-notification-50.png'
 import settingsIcon from '../assets/icons8-settings-50.png'
 import safetyIcon from '../assets/icons8-safety-50.png'
 import logoutIcon from "../assets/icons8-exit-50.png"
+import api from '../utils/api' // Import api utility
+
 export default function Dashboard() {
   const [activeSection, setActiveSection] = useState('dashboard')
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const [logoutLoading, setLogoutLoading] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [inProgressRide, setInProgressRide] = useState(null) // New state for in-progress ride
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const fetchInProgressRide = async () => {
+      try {
+        const res = await api.get('/rides/in-progress');
+        if (res.data && res.data.message !== 'No in-progress ride found for this driver.') {
+          setInProgressRide(res.data);
+        } else {
+          setInProgressRide(null);
+        }
+      } catch (err) {
+        console.error('Error fetching in-progress ride:', err);
+        setInProgressRide(null);
+      }
+    };
+
+    fetchInProgressRide();
+    // Optionally, refresh in-progress ride status periodically
+    const intervalId = setInterval(fetchInProgressRide, 10000); // Refresh every 10 seconds
+    return () => clearInterval(intervalId);
+  }, []);
 
   const handleLogout = () => {
     setShowLogoutDialog(true)
@@ -110,6 +136,12 @@ export default function Dashboard() {
             label="Find Ride"
             active={activeSection === 'findRide'}
             onClick={() => handleNavigation('findRide')}
+          />
+          <SidebarButton
+            icon={notificationIcon}
+            label="Upcoming Rides"
+            active={activeSection === 'upcomingRides'}
+            onClick={() => handleNavigation('upcomingRides')}
           />
           <SidebarButton
             icon={mapIcon}
@@ -198,9 +230,28 @@ export default function Dashboard() {
 
         <div className="p-8">
           <div className="max-w-7xl mx-auto">
+            {/* Show In-Progress Ride as overlay/banner if exists */}
+            {inProgressRide && (
+              <div className="mb-6 p-4 bg-green-600/20 border-2 border-green-500 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-green-300 font-semibold">🚗 Active Ride In Progress</p>
+                    <p className="text-sm text-green-200">You have an active ride. Complete payment to finish.</p>
+                  </div>
+                  <button
+                    onClick={() => setActiveSection('map')}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition"
+                  >
+                    Go to Live Map
+                  </button>
+                </div>
+              </div>
+            )}
+
             {activeSection === 'dashboard' && <DashboardHome onNavigate={setActiveSection} />}
             {activeSection === 'offerRide' && <OfferRide />}
             {activeSection === 'findRide' && <FindRide />}
+            {activeSection === 'upcomingRides' && <UpcomingRides />}
             {/* {activeSection === 'messages' && <Messages />} */}
             {activeSection === 'friends' && <Friends />}
             {/* {activeSection === 'communities' && <Communities />} */}

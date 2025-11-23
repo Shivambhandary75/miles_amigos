@@ -21,8 +21,8 @@ export default function SafetyHelp() {
   ]
 
   const emergencyServices = [
-    { name: 'Police', number: '911', icon: siren},
-    { name: 'Medical Emergency', number: '911', icon: siren },
+    { name: 'Police', number: '100', icon: siren},
+    { name: 'Medical Emergency', number: '108', icon: siren },
     { name: 'Roadside Assistance', number: '1-800-AAA-HELP', icon: siren },
   ]
 

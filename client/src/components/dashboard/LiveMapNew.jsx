@@ -1,45 +1,105 @@
 import { useState, useEffect } from 'react'
 import MapLibreMap from '../MapLibreMap'
-import { getRoute } from '../../utils/mapService'
-import ratingIcon from '../../assets/icons8-rating-50.png'
+import api from '../../utils/api'
 import location from '../../assets/icons8-location-50.png'
 
 export default function LiveMap() {
-  const [currentRide, setCurrentRide] = useState({
-    from: 'Downtown Station',
-    to: 'Airport Terminal',
-    driver: 'Sarah Johnson',
-    status: 'On the way',
-    progress: 65,
-    rating: 4.8,
-    eta: '12 min',
-    startCoords: [77.6245, 12.9352], // Bangalore downtown [lon, lat]
-    endCoords: [77.7099, 13.1939],   // Bangalore airport
-  })
-
+  const [acceptedRides, setAcceptedRides] = useState([])
+  const [passengerRides, setPassengerRides] = useState([])
+  const [currentRide, setCurrentRide] = useState(null)
+  const [userRole, setUserRole] = useState(null)
   const [routeInfo, setRouteInfo] = useState(null)
   const [selectedTileServer, setSelectedTileServer] = useState('openStreetMap')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  const nearbyRides = [
-    { id: 1, from: 'Mall District', to: 'Beach Road', seats: 2, rating: 4.7, distance: '0.5 km away', lat: 12.9352, lon: 77.6245 },
-    { id: 2, from: 'Tech Park', to: 'Downtown', seats: 1, rating: 4.9, distance: '1.2 km away', lat: 12.9716, lon: 77.6412 },
-    { id: 3, from: 'Airport', to: 'City Center', seats: 3, rating: 4.5, distance: '0.8 km away', lat: 13.1939, lon: 77.7099 },
-  ]
+  // Helper: extract name or object safely
+  const getName = (loc) => {
+    if (!loc) return "Unknown"
+    if (typeof loc === "string") return loc
+    return loc.name || "Unknown"
+  }
 
-  const driverMarkers = [
-    {
-      title: 'Sarah Johnson',
-      description: 'Current Driver - Rating 4.8★',
-      latitude: 12.96,
-      longitude: 77.63,
-    },
-    ...nearbyRides.map(ride => ({
-      title: `${ride.from} → ${ride.to}`,
-      description: `${ride.seats} seats • ${ride.rating}★ • ${ride.distance}`,
-      latitude: ride.lat,
-      longitude: ride.lon,
-    })),
-  ]
+  // Helper: extract [lng, lat]
+  const getCoords = (loc) => {
+    if (!loc) return [77.6245, 12.9352]
+    return [loc.lng ?? 77.6245, loc.lat ?? 12.9352]
+  }
+
+  useEffect(() => {
+    fetchAcceptedRides()
+  }, [])
+
+  const fetchAcceptedRides = async () => {
+    try {
+      setLoading(true)
+
+      const res = await api.get('/rides/history')
+      const rides = res.data.rides || []
+
+      // Separate roles
+      const driverRides = rides.filter(r => r.role === "driver")
+      const passengerRidesData = rides.filter(r => r.role === "passenger")
+
+      setAcceptedRides(driverRides)
+      setPassengerRides(passengerRidesData)
+
+      // Decide current ride
+      if (driverRides.length > 0) {
+        setUserRole("driver")
+
+        const ride = driverRides[0] // top-most active ride
+        setCurrentRide({
+          id: ride.id,
+          from: getName(ride.from),
+          to: getName(ride.to),
+          driver: "You",
+          status: ride.status,
+          rating: ride.rating || 0,
+          passengers: ride.passengers?.filter(p => p.status === "accepted") || [],
+          seats: ride.seats,
+          startCoords: getCoords(ride.from),
+          endCoords: getCoords(ride.to),
+          rideStatus: ride.status,
+          progress: 0,
+          eta: "TBD"
+        })
+
+      } else if (passengerRidesData.length > 0) {
+        setUserRole("passenger")
+
+        const ride = passengerRidesData[0]
+        setCurrentRide({
+          id: ride.id,
+          from: getName(ride.from),
+          to: getName(ride.to),
+          driver: ride.driver?.name || "Driver",
+          status: ride.status,
+          rating: ride.driver?.rating || 0,
+          passengers: [],
+          seats: ride.seats,
+          startCoords: getCoords(ride.from),
+          endCoords: getCoords(ride.to),
+          rideStatus: ride.status,
+          progress: 0,
+          eta: "TBD"
+        })
+
+      } else {
+        setUserRole(null)
+        setCurrentRide(null)
+      }
+
+      setError(null)
+
+    } catch (err) {
+      console.error("Error fetching rides:", err)
+      setError("Failed to load rides")
+      setCurrentRide(null)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleRouteChange = (route) => {
     setRouteInfo({
@@ -48,137 +108,208 @@ export default function LiveMap() {
     })
   }
 
-  const handleTileServerChange = (server) => {
-    setSelectedTileServer(server)
+  const handleTileServerChange = (server) => setSelectedTileServer(server)
+
+  const handlePaymentConfirm = async () => {
+    if (!currentRide) return
+
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject)
+      })
+
+      const { latitude: lat, longitude: lng } = position.coords
+
+      await api.post(`/rides/${currentRide.id}/confirm-payment`, {
+        driverLocation: { lat, lng }
+      })
+
+      alert("Payment confirmed")
+      setCurrentRide(null)
+      setAcceptedRides([])
+
+      setTimeout(fetchAcceptedRides, 1000)
+
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to confirm payment")
+    }
+  }
+
+  // Build markers for map
+  const driverMarkers = currentRide ? [
+    {
+      title: "Start",
+      description: userRole === "driver"
+        ? `${currentRide.passengers.length} accepted passengers`
+        : `Driver: ${currentRide.driver}`,
+      latitude: currentRide.startCoords[1],
+      longitude: currentRide.startCoords[0]
+    }
+  ] : []
+
+  // ------------------------------------------------------------------------------------
+  // RENDERING STARTS HERE
+  // ------------------------------------------------------------------------------------
+
+  if (loading) {
+    return (
+      <section>
+        <h1 className="text-4xl font-bold text-white mb-3">🗺️ Live Map</h1>
+        <p className="text-gray-400">Loading rides...</p>
+
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
+        </div>
+      </section>
+    )
+  }
+
+  if (!currentRide) {
+    return (
+      <section>
+        <h1 className="text-4xl font-bold text-white mb-3">🗺️ Live Map</h1>
+        <p className="text-gray-400 mb-6">No active rides</p>
+
+        {error && (
+          <div className="bg-red-500/20 border border-red-500/50 text-red-300 p-4 rounded-lg mb-4">
+            {error}
+          </div>
+        )}
+
+        <button
+          onClick={fetchAcceptedRides}
+          className="px-6 py-2 bg-green-600 text-white rounded-lg"
+        >
+          Refresh
+        </button>
+      </section>
+    )
   }
 
   return (
     <section>
-      <div className="mb-10">
-        <h1 className="text-4xl font-bold text-white mb-2">
-          🗺️ Live Map
-        </h1>
-        <p className="text-gray-400">Track rides using open-source maps (OSM + OSRM routing)</p>
-      </div>
+      <h1 className="text-4xl font-bold text-white mb-2">🗺️ Live Map</h1>
+      <p className="text-gray-400 mb-6">Track your rides using open-source maps</p>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* Map Container */}
+        
+        {/* MAP */}
         <div className="lg:col-span-3">
-          <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-blue-500/20 border border-white/10 bg-white/5 h-[500px]">
+          <div className="relative h-[500px] rounded-xl overflow-hidden border border-white/10">
             <MapLibreMap
               startLocation={currentRide.startCoords}
               endLocation={currentRide.endCoords}
               onRouteChange={handleRouteChange}
               tileServer={selectedTileServer}
-              showRoute={true}
               markers={driverMarkers}
+              showRoute={true}
               zoom={12}
             />
 
-            {/* Current Ride Info Overlay */}
-            <div className="absolute bottom-4 left-4 bg-gray-900/90 backdrop-blur-md border border-white/20 p-4 rounded-lg w-64">
-              <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
-                <span className="text-lg">🚗</span> {currentRide.driver}
-              </h3>
-              <div className="space-y-1 text-sm text-gray-300">
+            {/* Overlay ride info */}
+            <div className="absolute bottom-4 left-4 bg-black/60 p-4 rounded-lg w-64">
+              <h3 className="text-white font-semibold text-lg mb-2">🚗 {currentRide.driver}</h3>
+
+              <div className="text-gray-300 text-sm space-y-1">
                 <p className="flex items-center gap-2">
-                  <img src={location} alt="From" className="w-4 h-4" />
+                  <img src={location} className="w-4 h-4" />
                   From: {currentRide.from}
                 </p>
                 <p className="flex items-center gap-2">
-                  <img src={location} alt="To" className="w-4 h-4" />
+                  <img src={location} className="w-4 h-4" />
                   To: {currentRide.to}
                 </p>
-                <p className="flex items-center gap-2">
-                  <img src={ratingIcon} alt="Rating" className="w-4 h-4" />
-                  Rating: {currentRide.rating}⭐
-                </p>
+                <p>Passengers: {currentRide.passengers?.length || 0}</p>
               </div>
-
-              {/* Progress Bar */}
-              <div className="mt-3">
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-gray-400">{currentRide.status}</span>
-                  <span className="text-green-400">{currentRide.progress}%</span>
-                </div>
-                <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
-                  <div
-                    className="bg-gradient-to-r from-green-500 to-blue-500 h-full transition-all"
-                    style={{ width: `${currentRide.progress}%` }}
-                  />
-                </div>
-              </div>
-
-              <p className="text-xs text-yellow-400 mt-2 font-semibold">⏱️ ETA: {currentRide.eta}</p>
             </div>
 
-            {/* Tile Server Selector */}
+            {/* Tile server controls */}
             <div className="absolute top-4 right-4 flex gap-2">
-              {['openStreetMap', 'openTopoMap', 'cartoDB'].map(server => (
+              {["openStreetMap", "openTopoMap", "cartoDB"].map(server => (
                 <button
                   key={server}
                   onClick={() => handleTileServerChange(server)}
-                  className={`px-3 py-1 rounded text-xs font-semibold transition ${
+                  className={`px-3 py-1 rounded text-xs ${
                     selectedTileServer === server
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                    ? "bg-blue-600 text-white"
+                    : "bg-white/20 text-gray-200"
                   }`}
                 >
-                  {server === 'openStreetMap' ? 'OSM' : server === 'openTopoMap' ? 'Topo' : 'CartoDB'}
+                  {server}
                 </button>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Nearby Rides Sidebar */}
+        {/* SIDEBAR */}
         <div className="space-y-4">
-          <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 backdrop-blur-lg p-6 rounded-2xl border border-blue-500/30">
-            <h3 className="text-lg font-bold text-white mb-4">📍 Nearby Rides</h3>
+
+          {/* ACTIVE RIDES LIST */}
+          <div className="bg-white/10 p-4 rounded-xl border border-white/20">
+            <h3 className="text-white font-bold mb-3">
+              {userRole === "driver" ? "Accepted Rides" : "Your Rides"}
+            </h3>
+
             <div className="space-y-3">
-              {nearbyRides.map(ride => (
-                <div key={ride.id} className="bg-white/5 hover:bg-white/10 p-3 rounded-lg cursor-pointer transition border border-white/10">
-                  <p className="text-sm font-semibold text-white">{ride.from}</p>
-                  <p className="text-xs text-gray-400 mb-2">→ {ride.to}</p>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-green-400">💺 {ride.seats} seats</span>
-                    <span className="text-yellow-400">⭐ {ride.rating}</span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">{ride.distance}</p>
+              {(userRole === "driver" ? acceptedRides : passengerRides).map((ride, index) => (
+                <div
+                  key={ride.id}
+                  className={`p-3 rounded-lg cursor-pointer ${
+                    index === 0 ? "bg-green-600/20 border border-green-500/50" : "bg-white/10"
+                  }`}
+                >
+                  {index === 0 && (
+                    <p className="text-green-400 text-xs mb-1">📍 Current Ride</p>
+                  )}
+
+                  <p className="text-white font-semibold">{getName(ride.from)}</p>
+                  <p className="text-gray-400 text-sm">→ {getName(ride.to)}</p>
+
+                  <p className="text-gray-400 text-xs mt-1">
+                    Status: {ride.status}
+                  </p>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Route Information */}
+          {/* ROUTE INFO */}
           {routeInfo && (
-            <div className="bg-gradient-to-br from-green-500/10 to-green-600/5 backdrop-blur-lg p-6 rounded-2xl border border-green-500/30">
-              <h3 className="text-lg font-bold text-white mb-4">📊 Route Info</h3>
-              <div className="space-y-2 text-sm">
-                <p className="text-gray-300">
-                  <span className="text-green-400 font-semibold">Distance:</span> {routeInfo.distance.toFixed(2)} km
-                </p>
-                <p className="text-gray-300">
-                  <span className="text-green-400 font-semibold">Duration:</span> {routeInfo.duration} min
-                </p>
-                <p className="text-gray-400 text-xs mt-3">
-                  Using OpenStreetMap + OSRM routing
-                </p>
-              </div>
+            <div className="bg-white/10 p-4 rounded-xl border border-green-400/30">
+              <h3 className="text-white font-bold mb-2">📊 Route Info</h3>
+              <p className="text-gray-300 text-sm">Distance: {routeInfo.distance.toFixed(2)} km</p>
+              <p className="text-gray-300 text-sm">Duration: {routeInfo.duration} min</p>
             </div>
           )}
 
-          {/* Map Info */}
-          <div className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 backdrop-blur-lg p-6 rounded-2xl border border-purple-500/30">
-            <h3 className="text-sm font-bold text-white mb-3">🔍 Map Details</h3>
-            <div className="text-xs text-gray-400 space-y-2">
-              <p>✓ Open-source tiles</p>
-              <p>✓ Free routing</p>
-              <p>✓ Real-time navigation</p>
-              <p>✓ Multiple map styles</p>
+          {/* DRIVER PAYMENT BUTTON */}
+          {currentRide && userRole === "driver" && currentRide.rideStatus === "in-progress" && (
+            <button
+              onClick={handlePaymentConfirm}
+              className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg"
+            >
+              💰 Confirm Payment
+            </button>
+          )}
+
+          {/* PASSENGER WAITING MESSAGE */}
+          {userRole === "passenger" && (
+            <div className="bg-blue-600/20 text-blue-200 p-3 rounded-lg">
+              Waiting for driver to complete the ride...
             </div>
-          </div>
+          )}
+
+          {/* MANUAL REFRESH */}
+          <button
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg"
+            onClick={fetchAcceptedRides}
+          >
+            Refresh
+          </button>
+
         </div>
+
       </div>
     </section>
   )

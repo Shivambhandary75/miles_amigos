@@ -31,6 +31,9 @@ export function AppProvider({ children }) {
     return savedLiveRides ? JSON.parse(savedLiveRides) : []
   })
 
+  // Last booked ride
+  const [lastBookedRide, setLastBookedRide] = useState(null);
+
   // Messages - load from localStorage
   const [messages, setMessages] = useState(() => {
     const savedMessages = localStorage.getItem('userMessages')
@@ -113,6 +116,7 @@ export function AppProvider({ children }) {
   // Add booking
   const addBooking = (booking) => {
     setBookings(prev => [...prev, { ...booking, id: prev.length + 1 }])
+    setLastBookedRide(booking); // Set the last booked ride
   }
 
   // Update booking status
@@ -162,6 +166,8 @@ export function AppProvider({ children }) {
     liveRides,
     setLiveRides,
     addRide,
+    lastBookedRide, // Export lastBookedRide
+    setLastBookedRide, // Export setLastBookedRide
     messages,
     addMessage,
     friends,

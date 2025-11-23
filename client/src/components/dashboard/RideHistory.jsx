@@ -101,14 +101,40 @@ export default function RideHistory() {
     setShowRatingModal(true)
   }
 
-  const handleSubmitRating = () => {
+  const handleSubmitRating = async () => {
     if (userRating === 0) {
       alert('Please select a rating')
       return
     }
-    alert(`Ride rated ${userRating} stars!\nComment: ${ratingComment || 'No comment'}`)
-    setShowRatingModal(false)
-    setSelectedRide(null)
+    
+    try {
+      // Submit rating to backend
+      await api.post(`/rides/${selectedRide._id || selectedRide.id}/rate`, {
+        rating: userRating,
+        comment: ratingComment
+      })
+
+      // Add driver as friend if they're not already
+      if (selectedRide.role === 'passenger' && selectedRide.driver) {
+        try {
+          await api.post('/users/add-friend', {
+            friendId: selectedRide.driver.id
+          })
+          console.log('Driver added as friend')
+        } catch (err) {
+          console.log('Could not add driver as friend:', err)
+        }
+      }
+
+      alert(`Ride rated ${userRating} stars!\nDriver added to your friends list.`)
+      setShowRatingModal(false)
+      setSelectedRide(null)
+      setUserRating(0)
+      setRatingComment('')
+    } catch (err) {
+      console.error('Error submitting rating:', err)
+      alert('Failed to submit rating: ' + (err.response?.data?.message || err.message))
+    }
   }
 
   return (
@@ -141,8 +167,8 @@ export default function RideHistory() {
       {selectedRide && (
         <div className="mb-8 rounded-2xl overflow-hidden border border-white/10 shadow-lg" style={{ height: '400px' }}>
           <MapLibreMap
-            startLocation={[77.5946, 12.9716]} // Default Bangalore center
-            endLocation={[77.7099, 13.1939]}   // Default Bangalore airport
+            startLocation={[selectedRide.from.lng, selectedRide.from.lat]}
+            endLocation={[selectedRide.to.lng, selectedRide.to.lat]}
             showRoute={true}
             zoom={12}
           />
@@ -167,10 +193,10 @@ export default function RideHistory() {
               const time = ride?.time || 'N/A';
               const status = ride?.status || 'pending';
               const role = ride?.role || 'passenger';
-              const driver = ride?.driver || 'Unknown';
-              const rating = typeof ride?.rating === 'number' ? ride.rating : 'N/A';
+              const driver = ride?.driver?.name || 'Unknown';
+              const rating = ride?.driver?.rating ?? 'N/A';
               const seats = typeof ride?.seats === 'number' ? ride.seats : 'N/A';
-              const fare = typeof ride?.fare === 'number' ? ride.fare : 'N/A';
+              const fare = ride?.fare || 'N/A'; // Fare can be a string like '₹100'
               const id = ride?.id || ride?._id || Math.random();
 
               return (
@@ -265,12 +291,12 @@ export default function RideHistory() {
                 <div className="space-y-2">
                   <div>
                     <p className="text-gray-500 text-xs">From</p>
-                    <p className="text-white font-semibold">{selectedRide.from}</p>
+                    <p className="text-white font-semibold">{selectedRide.from.name}</p>
                   </div>
                   <div className="text-green-400 text-center">↓</div>
                   <div>
                     <p className="text-gray-500 text-xs">To</p>
-                    <p className="text-white font-semibold">{selectedRide.to}</p>
+                    <p className="text-white font-semibold">{selectedRide.to.name}</p>
                   </div>
                 </div>
               </div>
@@ -291,9 +317,9 @@ export default function RideHistory() {
               <div className="bg-white/5 p-4 rounded-lg">
                 <p className="text-gray-400 text-xs mb-2">Driver</p>
                 <p className="text-white font-semibold flex items-center gap-2">
-                  {selectedRide.driver}
+                  {selectedRide.driver.name}
                   <img src={ratingIcon} alt="Rating" className="w-4 h-4" />
-                  {selectedRide.rating}
+                  {selectedRide.driver.rating}
                 </p>
               </div>
 
@@ -341,7 +367,7 @@ export default function RideHistory() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-gray-800 border border-white/10 rounded-2xl p-8 max-w-md w-full">
             <h2 className="text-2xl font-bold text-white mb-2">Rate this Ride</h2>
-            <p className="text-gray-400 mb-6 text-sm">How was your experience with {selectedRide.driver}?</p>
+            <p className="text-gray-400 mb-6 text-sm">How was your experience with {selectedRide.driver.name}?</p>
 
             {/* Star Rating */}
             <div className="bg-white/5 p-6 rounded-lg mb-6 text-center">

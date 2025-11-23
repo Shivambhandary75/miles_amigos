@@ -32,6 +32,7 @@ const UserSchema = new mongoose.Schema({
         max: 5,
         default: 0
     },
+    
     verifications: {
         email: { type: Boolean, default: false },
         phone: { type: Boolean, default: false },
@@ -53,7 +54,21 @@ const UserSchema = new mongoose.Schema({
     TakenRides: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: "Ride"
-    }]
+    }],
+
+    friends: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
+    }],
+
+    notifications: [new mongoose.Schema({
+        icon: String,
+        title: String,
+        desc: String,
+        time: String,
+        type: String,
+        createdAt: { type: Date, default: Date.now }
+    }, { _id: true })]
 
 }, {
     timestamps: true

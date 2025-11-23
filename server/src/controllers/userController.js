@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const Ride = require("../models/Ride");
 const { generateToken } = require("../utils/token");
 
 // Register new user
@@ -147,12 +148,27 @@ exports.updateUserProfile = async (req, res) => {
   }
 };
 
+// @desc    Get user notifications
+// @route   GET /api/users/notifications
+// @access  Private
+exports.getNotifications = async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select('notifications');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    return res.status(200).json({ success: true, notifications: user.notifications || [] });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 // @desc    Get user dashboard stats
 // @route   GET /api/users/stats
 // @access  Private
 exports.getUserStats = async (req, res) => {
   try {
-    const Ride = require("../models/Ride");
     const user = await User.findById(req.userId).populate(
       "GivenRides TakenRides"
     );
@@ -195,4 +211,170 @@ exports.getUserStats = async (req, res) => {
     console.error("Error fetching user stats:", error);
     return res.status(500).json({ success: false, message: "Server error" });
   }
+};
+
+// @desc    Confirm ride completion
+// @route   POST /api/users/rides/:id/confirm-completion
+// @access  Private
+exports.confirmRideCompletion = async (req, res) => {
+    try {
+        const rideId = req.params.id;
+        const passengerId = req.userId;
+
+        const ride = await Ride.findById(rideId).populate('driver');
+
+        if (!ride) {
+            return res.status(404).json({ message: 'Ride not found' });
+        }
+
+        const isPassenger = ride.passengers.some(p => p.user.equals(passengerId));
+
+        if (!isPassenger) {
+            return res.status(403).json({ message: 'You are not authorized to perform this action' });
+        }
+
+        ride.status = 'completed';
+        await ride.save();
+
+        // Notify driver
+        const driver = ride.driver;
+        driver.notifications.push({
+            title: 'Ride Completed',
+            desc: `The passenger has confirmed the completion of the ride from ${ride.startLocation.name} to ${ride.endLocation.name}.`,
+            type: 'ride-update'
+        });
+        await driver.save();
+
+        res.json({ message: 'Ride completion confirmed' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// @desc    Add a friend
+// @route   POST /api/users/add-friend
+// @access  Private
+exports.addFriend = async (req, res) => {
+    try {
+        const { friendId } = req.body;
+        const userId = req.userId;
+
+        if (!friendId) {
+            return res.status(400).json({ success: false, message: 'Friend ID is required' });
+        }
+
+        const user = await User.findById(userId);
+        const friend = await User.findById(friendId);
+
+        if (!user || !friend) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        // Check if already friends
+        if (user.friends.includes(friendId)) {
+            return res.status(400).json({ success: false, message: 'Already friends with this user' });
+        }
+
+        // Add friend
+        user.friends.push(friendId);
+        await user.save();
+
+        res.json({ success: true, message: 'Friend added successfully' });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
+// @desc    Get user's friends
+// @route   GET /api/users/friends
+// @access  Private
+exports.getFriends = async (req, res) => {
+    try {
+        const user = await User.findById(req.userId);
+        if (!user) {
+          return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        // Find all completed rides where user was driver or passenger
+        const completedRides = await Ride.find({
+          status: 'completed',
+          $or: [
+            { driver: user._id },
+            { 'passengers.user': user._id }
+          ]
+        }).populate('driver', 'name email Rating avatar phone').populate('passengers.user', 'name email Rating avatar phone');
+
+        // Collect all unique user IDs (other than self) from these rides
+        const riderMap = new Map();
+        for (const ride of completedRides) {
+          // Add driver if not self
+          if (ride.driver && ride.driver._id.toString() !== user._id.toString()) {
+            riderMap.set(ride.driver._id.toString(), ride.driver);
+          }
+          // Add all passengers except self
+          for (const p of ride.passengers) {
+            if (p.user && p.user._id.toString() !== user._id.toString()) {
+              riderMap.set(p.user._id.toString(), p.user);
+            }
+          }
+        }
+
+        // Get ride counts for each rider
+        const friendsWithStats = await Promise.all(
+          Array.from(riderMap.values()).map(async (rider) => {
+            const ridesTogether = await Ride.countDocuments({
+              status: 'completed',
+              $or: [
+                { driver: user._id, 'passengers.user': rider._id },
+                { driver: rider._id, 'passengers.user': user._id }
+              ]
+            });
+            return {
+              _id: rider._id,
+              name: rider.name,
+              email: rider.email,
+              avatar: rider.avatar,
+              phone: rider.phone,
+              rating: rider.Rating || 0,
+              rides: ridesTogether
+            };
+          })
+        );
+
+        res.json({ success: true, friends: friendsWithStats });
+    } catch (err) {
+        console.error('Error in getFriends:', err);
+        return res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
+// @desc    Delete a friend
+// @route   DELETE /api/users/friends/:friendId
+// @access  Private
+exports.deleteFriend = async (req, res) => {
+    try {
+        const { friendId } = req.params;
+        const userId = req.userId;
+
+        if (!friendId) {
+            return res.status(400).json({ success: false, message: 'Friend ID is required' });
+        }
+
+        const user = await User.findByIdAndUpdate(
+            userId,
+            { $pull: { friends: friendId } },
+            { new: true }
+        );
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        res.json({ success: true, message: 'Friend removed successfully' });
+    } catch (err) {
+        console.error('Error in deleteFriend:', err);
+        return res.status(500).json({ success: false, message: 'Server error' });
+    }
 };
