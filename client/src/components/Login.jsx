@@ -14,10 +14,14 @@ export default function Login({ switchToSignup }) {
     try {
       const body = { email, password }
       const res = await api.post('/users/login', body)
+      console.log('Login response:', res?.data)
       if (res?.data?.success) {
         const { token, user } = res.data
+        console.log('Token received:', token)
         setAuthToken(token)
+        console.log('Token set in localStorage:', localStorage.getItem('authToken'))
         setProfileFromAuth({ username: user.name || user.email.split('@')[0], email: user.email })
+        console.log('Navigating to dashboard...')
         navigate('/dashboard')
       } else {
         alert(res?.data?.message || 'Login failed')
@@ -46,6 +50,7 @@ export default function Login({ switchToSignup }) {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
           className="px-4 py-2 border border-gray-400 rounded bg-white/80 text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-600"
           required
         />
