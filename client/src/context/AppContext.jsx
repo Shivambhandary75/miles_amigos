@@ -1,4 +1,5 @@
 import { createContext, useState, useContext, useEffect } from 'react'
+import { api } from '../utils/api'
 
 const AppContext = createContext()
 
@@ -34,54 +35,51 @@ export function AppProvider({ children }) {
   // Last booked ride
   const [lastBookedRide, setLastBookedRide] = useState(null);
 
-  // Messages - load from localStorage
-  const [messages, setMessages] = useState(() => {
-    const savedMessages = localStorage.getItem('userMessages')
-    if (savedMessages) {
-      return JSON.parse(savedMessages)
-    }
-    return {
-      personalChats: [
-        { id: 1, userId: 'user1', name: 'Alex Smith', avatar: '👤', lastMessage: 'See you tomorrow!', timestamp: '2 hours ago' },
-        { id: 2, userId: 'user2', name: 'Emma Wilson', avatar: '👤', lastMessage: 'Thanks for the ride!', timestamp: '5 hours ago' },
-      ],
-      communityChatList: [
-        { id: 1, communityId: 'comm1', name: 'Downtown Riders', avatar: '👥', lastMessage: 'Anyone going to the mall?', timestamp: '1 hour ago' },
-      ],
-    }
+  // Messages - load from API
+  const [messages, setMessages] = useState({
+    personalChats: [],
+    communityChatList: []
   })
 
-  // Friends - load from localStorage
-  const [friends, setFriends] = useState(() => {
-    const savedFriends = localStorage.getItem('userFriends')
-    if (savedFriends) {
-      return JSON.parse(savedFriends)
-    }
-    return [
-      { id: 1, name: 'Alex Smith', status: 'online', rating: 4.9, rides: 45, avatar: '👤' },
-      { id: 2, name: 'Emma Wilson', status: 'offline', rating: 4.7, rides: 32, avatar: '👤' },
-      { id: 3, name: 'Michael Brown', status: 'online', rating: 4.8, rides: 28, avatar: '👤' },
-    ]
-  })
+  // Friends - load from API
+  const [friends, setFriends] = useState([])
 
-  // Communities - load from localStorage
-  const [communities, setCommunities] = useState(() => {
-    const savedCommunities = localStorage.getItem('communities')
-    if (savedCommunities) {
-      return JSON.parse(savedCommunities)
-    }
-    return [
-      { id: 1, name: 'Downtown Riders', category: 'Location', members: 342, icon: '📍' },
-      { id: 2, name: 'Morning Commute', category: 'Schedule', members: 156, icon: '🌅' },
-      { id: 3, name: 'Weekend Trips', category: 'Activity', members: 89, icon: '🚗' },
-    ]
-  })
+  // Communities - load from API
+  const [communities, setCommunities] = useState([])
 
-  // Joined communities - load from localStorage
-  const [joinedCommunities, setJoinedCommunities] = useState(() => {
-    const savedJoined = localStorage.getItem('joinedCommunities')
-    return savedJoined ? JSON.parse(savedJoined) : []
-  })
+  // Joined communities - load from API
+  const [joinedCommunities, setJoinedCommunities] = useState([])
+
+  // Chat state for navigation
+  const [currentChat, setCurrentChat] = useState(null)
+  const [chatType, setChatType] = useState('personal') // 'personal' or 'community'
+
+  // Load initial data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (!token) return;
+
+        // Fetch friends
+        // const friendsRes = await api.get('/users/friends');
+        // setFriends(friendsRes.data);
+
+        // Fetch communities
+        const communitiesRes = await api.get('/communities');
+        setCommunities(communitiesRes.data);
+
+        // Fetch conversations
+        const conversationsRes = await api.get('/messages/conversations');
+        setMessages(prev => ({ ...prev, personalChats: conversationsRes.data }));
+
+      } catch (error) {
+        console.error('Error fetching initial data:', error);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   // Save bookings to localStorage
   useEffect(() => {
@@ -92,26 +90,6 @@ export function AppProvider({ children }) {
   useEffect(() => {
     localStorage.setItem('liveRides', JSON.stringify(liveRides))
   }, [liveRides])
-
-  // Save messages to localStorage
-  useEffect(() => {
-    localStorage.setItem('userMessages', JSON.stringify(messages))
-  }, [messages])
-
-  // Save friends to localStorage
-  useEffect(() => {
-    localStorage.setItem('userFriends', JSON.stringify(friends))
-  }, [friends])
-
-  // Save communities to localStorage
-  useEffect(() => {
-    localStorage.setItem('communities', JSON.stringify(communities))
-  }, [communities])
-
-  // Save joined communities to localStorage
-  useEffect(() => {
-    localStorage.setItem('joinedCommunities', JSON.stringify(joinedCommunities))
-  }, [joinedCommunities])
 
   // Add booking
   const addBooking = (booking) => {
@@ -128,30 +106,66 @@ export function AppProvider({ children }) {
     )
   }
 
-  // Add message
-  const addMessage = (chatType, chatId, message) => {
-    // This would be expanded to actually store messages
-    console.log(`Message sent to ${chatType} chat ${chatId}:`, message)
+  // Send message
+  const addMessage = async (chatType, chatId, message) => {
+    try {
+      if (chatType === 'community') {
+        await api.post(`/communities/${chatId}/messages`, { content: message });
+        // Optimistically update or re-fetch would be better, but for now we rely on re-fetch in component
+      } else {
+        await api.post('/messages', { receiverId: chatId, content: message });
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
   }
 
   // Add friend
-  const addFriend = (friend) => {
-    setFriends(prev => [...prev, { ...friend, id: prev.length + 1 }])
+  const addFriend = async (friendId) => {
+    try {
+      await api.post('/users/add-friend', { friendId });
+      // Refresh friends list
+      const res = await api.get('/users/friends');
+      setFriends(res.data);
+    } catch (error) {
+      console.error('Error adding friend:', error);
+    }
   }
 
   // Remove friend
-  const removeFriend = (friendId) => {
-    setFriends(prev => prev.filter(f => f.id !== friendId))
+  const removeFriend = async (friendId) => {
+    try {
+      await api.delete(`/users/friends/${friendId}`);
+      setFriends(prev => prev.filter(f => f._id !== friendId));
+    } catch (error) {
+      console.error('Error removing friend:', error);
+    }
   }
 
   // Join community
-  const joinCommunity = (communityId) => {
-    setJoinedCommunities(prev => [...prev, communityId])
+  const joinCommunity = async (communityId) => {
+    try {
+      await api.post(`/communities/${communityId}/join`);
+      setJoinedCommunities(prev => [...prev, communityId]);
+      // Refresh communities to update member count/status if needed
+      const res = await api.get('/communities');
+      setCommunities(res.data);
+    } catch (error) {
+      console.error('Error joining community:', error);
+    }
   }
 
   // Leave community
-  const leaveCommunity = (communityId) => {
-    setJoinedCommunities(prev => prev.filter(id => id !== communityId))
+  const leaveCommunity = async (communityId) => {
+    try {
+      await api.post(`/communities/${communityId}/leave`);
+      setJoinedCommunities(prev => prev.filter(id => id !== communityId));
+      // Refresh communities
+      const res = await api.get('/communities');
+      setCommunities(res.data);
+    } catch (error) {
+      console.error('Error leaving community:', error);
+    }
   }
 
   // Add a ride to liveRides
@@ -169,6 +183,7 @@ export function AppProvider({ children }) {
     lastBookedRide, // Export lastBookedRide
     setLastBookedRide, // Export setLastBookedRide
     messages,
+    setMessages, // Export setMessages for manual updates
     addMessage,
     friends,
     addFriend,
@@ -177,6 +192,10 @@ export function AppProvider({ children }) {
     joinedCommunities,
     joinCommunity,
     leaveCommunity,
+    currentChat,
+    setCurrentChat,
+    chatType,
+    setChatType,
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

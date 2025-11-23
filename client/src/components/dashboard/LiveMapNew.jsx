@@ -36,7 +36,7 @@ export default function LiveMap() {
   // Initialize Socket.IO and get user ID
   useEffect(() => {
     initSocket()
-    
+
     // Get current user ID from API or localStorage
     api.get('/users/me').then(res => {
       setUserId(res.data._id)
@@ -51,7 +51,7 @@ export default function LiveMap() {
       console.log('========================================')
       console.log('✅ [SOCKET] Received location update:')
       console.log('========================================')
-      
+
       if (locations.driver) {
         console.log('🚗 Driver Location:')
         console.log(`   - User ID: ${locations.driver.userId}`)
@@ -59,7 +59,7 @@ export default function LiveMap() {
         console.log(`   - Longitude: ${locations.driver.lng}`)
         console.log(`   - Coordinates: [${locations.driver.lng}, ${locations.driver.lat}]`)
       }
-      
+
       if (locations.passengers && locations.passengers.length > 0) {
         console.log(`👥 Passenger Locations (${locations.passengers.length}):`)
         locations.passengers.forEach((passenger, idx) => {
@@ -70,10 +70,10 @@ export default function LiveMap() {
           console.log(`   - Coordinates: [${passenger.lng}, ${passenger.lat}]`)
         })
       }
-      
+
       console.log('Time:', new Date().toLocaleTimeString())
       console.log('========================================\n')
-      
+
       setLiveLocations(locations)
     }
 
@@ -93,7 +93,7 @@ export default function LiveMap() {
         (position) => {
           const { latitude: lat, longitude: lng } = position.coords
           const accuracy = position.coords.accuracy
-          
+
           console.log('========================================')
           console.log('📍 [GEOLOCATION] Current Location:')
           console.log('========================================')
@@ -107,7 +107,7 @@ export default function LiveMap() {
           console.log('Time:', new Date().toLocaleTimeString())
           console.log('========================================')
           console.log('📤 Sending to server...\n')
-          
+
           // Send location to server
           updateLocation(currentRide.id, userId, userRole, lat, lng)
         },
@@ -159,9 +159,19 @@ export default function LiveMap() {
       const res = await api.get('/rides/history')
       const rides = res.data.rides || []
 
+      // Filter for active rides only (scheduled or in-progress)
+      const activeRides = rides.filter(r => r.status === 'scheduled' || r.status === 'in-progress')
+
+      // Sort to prioritize in-progress rides
+      activeRides.sort((a, b) => {
+        if (a.status === 'in-progress' && b.status !== 'in-progress') return -1
+        if (a.status !== 'in-progress' && b.status === 'in-progress') return 1
+        return 0 // Keep original order (date based) for same status
+      })
+
       // Separate roles
-      const driverRides = rides.filter(r => r.role === "driver")
-      const passengerRidesData = rides.filter(r => r.role === "passenger")
+      const driverRides = activeRides.filter(r => r.role === "driver")
+      const passengerRidesData = activeRides.filter(r => r.role === "passenger")
 
       setAcceptedRides(driverRides)
       setPassengerRides(passengerRidesData)
@@ -194,7 +204,7 @@ export default function LiveMap() {
         console.log('   Total passengers:', ride.passengers?.length || 0)
         console.log('   Accepted passengers:', acceptedPassengers.length)
         console.log('   Passenger data:', acceptedPassengers)
-        
+
         const passengerPointsData = acceptedPassengers.map((passenger, idx) => {
           const pickupCoords = getCoords(passenger.startLocation)
           const dropCoords = getCoords(passenger.endLocation)
@@ -204,7 +214,7 @@ export default function LiveMap() {
           console.log(`     - Drop coords: [${dropCoords[0]}, ${dropCoords[1]}]`)
           console.log(`     - Pickup valid: ${typeof pickupCoords[0] === 'number' && typeof pickupCoords[1] === 'number'}`)
           console.log(`     - Drop valid: ${typeof dropCoords[0] === 'number' && typeof dropCoords[1] === 'number'}`)
-          
+
           return {
             pickupCoords: pickupCoords,
             dropCoords: dropCoords,
@@ -226,10 +236,10 @@ export default function LiveMap() {
         setUserRole("passenger")
 
         const ride = passengerRidesData[0]
-        
+
         // For passenger, get their actual pickup/drop location from the passengers array
         const passengerEntry = ride.passengers?.find(p => p.user === userId || p.user?._id === userId)
-        
+
         const newCurrentRide = {
           id: ride.id,
           from: passengerEntry ? getName(passengerEntry.startLocation) : getName(ride.from),
@@ -321,11 +331,11 @@ export default function LiveMap() {
       })
 
       console.log('✅ Payment confirmed - Clearing ride from live map')
-      
+
       // Stop Socket.IO listeners for this ride
-      removeLocationsUpdateListener(() => {})
+      removeLocationsUpdateListener(() => { })
       leaveRide()
-      
+
       // Clear all ride data from live map
       setCurrentRide(null)
       setAcceptedRides([])
@@ -335,17 +345,17 @@ export default function LiveMap() {
       setPassengerPoints(null)
       setRouteInfo(null)
       setUserRole(null)
-      
+
       // Stop geolocation tracking
       if (watchId) {
         navigator.geolocation.clearWatch(watchId)
         setWatchId(null)
         console.log('🛑 Geolocation tracking stopped')
       }
-      
+
       // Show success message
       alert("✅ Payment confirmed! Ride completed and removed from live map.")
-      
+
       // Refresh to get latest rides
       setTimeout(() => {
         console.log('🔄 Refreshing rides list...')
@@ -363,15 +373,15 @@ export default function LiveMap() {
 
     try {
       await api.post(`/rides/${currentRide.id}/start`)
-      
+
       // Update local state to show payment button
       setCurrentRide({
         ...currentRide,
         rideStatus: 'in-progress'
       })
-      
+
       alert("Ride started! You can now see the payment button.")
-      
+
       // Refresh to get latest data
       setTimeout(fetchAcceptedRides, 500)
     } catch (err) {
@@ -436,7 +446,7 @@ export default function LiveMap() {
       <p className="text-gray-400 mb-6">Track your rides using open-source maps</p>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        
+
         {/* MAP */}
         <div className="lg:col-span-3">
           <div className="relative h-[500px] rounded-xl overflow-hidden border border-white/10">
@@ -516,7 +526,7 @@ export default function LiveMap() {
             {liveLocations && (
               <div className="absolute top-20 left-4 bg-black/80 p-4 rounded-lg text-xs max-w-xs max-h-64 overflow-y-auto border border-green-500/30">
                 <p className="text-green-400 font-bold mb-2">🗺️ Live Locations</p>
-                
+
                 {liveLocations.driver && (
                   <div className="mb-3 pb-2 border-b border-green-500/20">
                     <p className="text-blue-400 font-semibold">🚗 Driver Location</p>
@@ -527,7 +537,7 @@ export default function LiveMap() {
                     )}
                   </div>
                 )}
-                
+
                 {liveLocations.passengers && liveLocations.passengers.length > 0 && (
                   <div>
                     <p className="text-green-400 font-semibold mb-2">👥 Passengers ({liveLocations.passengers.length})</p>
@@ -543,7 +553,7 @@ export default function LiveMap() {
                     ))}
                   </div>
                 )}
-                
+
                 {!liveLocations.driver && (!liveLocations.passengers || liveLocations.passengers.length === 0) && (
                   <p className="text-yellow-400 text-xs">Waiting for location updates...</p>
                 )}
@@ -556,11 +566,10 @@ export default function LiveMap() {
                 <button
                   key={server}
                   onClick={() => handleTileServerChange(server)}
-                  className={`px-3 py-1 rounded text-xs ${
-                    selectedTileServer === server
-                    ? "bg-blue-600 text-white"
-                    : "bg-white/20 text-gray-200"
-                  }`}
+                  className={`px-3 py-1 rounded text-xs ${selectedTileServer === server
+                      ? "bg-blue-600 text-white"
+                      : "bg-white/20 text-gray-200"
+                    }`}
                 >
                   {server}
                 </button>
@@ -582,9 +591,8 @@ export default function LiveMap() {
               {(userRole === "driver" ? acceptedRides : passengerRides).map((ride, index) => (
                 <div
                   key={ride.id}
-                  className={`p-3 rounded-lg cursor-pointer ${
-                    index === 0 ? "bg-green-600/20 border border-green-500/50" : "bg-white/10"
-                  }`}
+                  className={`p-3 rounded-lg cursor-pointer ${index === 0 ? "bg-green-600/20 border border-green-500/50" : "bg-white/10"
+                    }`}
                 >
                   {index === 0 && (
                     <p className="text-green-400 text-xs mb-1">📍 Current Ride</p>

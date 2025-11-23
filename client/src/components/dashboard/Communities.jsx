@@ -1,12 +1,22 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import communityIcon from '../../assets/icons8-community-50.png'
 import carIcon from '../../assets/icons8-car-50.png'
 import profileIcon from '../../assets/icons8-profile-50.png'
 import ratingIcon from '../../assets/icons8-rating-50.png'
 import ConfirmationDialog from '../ConfirmationDialog'
+import { useApp } from '../../context/AppContext'
+import { api } from '../../utils/api'
 
-export default function Communities() {
-  const [joinedCommunities, setJoinedCommunities] = useState([])
+export default function Communities({ onNavigate }) {
+  const {
+    communities,
+    joinedCommunities,
+    joinCommunity,
+    leaveCommunity,
+    friends,
+    setCurrentChat,
+    setChatType
+  } = useApp()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showLeaveDialog, setShowLeaveDialog] = useState(false)
   const [showMembersModal, setShowMembersModal] = useState(false)
@@ -19,28 +29,13 @@ export default function Communities() {
     selectedFriends: [],
   })
 
-  const allFriends = [
-    { id: 1, name: 'Alice Johnson' },
-    { id: 2, name: 'Bob Smith' },
-    { id: 3, name: 'Carol Davis' },
-    { id: 4, name: 'David Wilson' },
-    { id: 5, name: 'Emma Brown' },
-    { id: 6, name: 'Frank Miller' },
-  ]
-
+  // Mock community members for now (since we don't have a full members API yet)
   const communityMembers = [
     { id: 1, name: 'Alice Johnson', rating: 4.9, rides: 23, avatar: profileIcon, role: 'Admin' },
     { id: 2, name: 'Bob Smith', rating: 4.7, rides: 18, avatar: profileIcon, role: 'Member' },
     { id: 3, name: 'Carol Davis', rating: 4.8, rides: 31, avatar: profileIcon, role: 'Member' },
     { id: 4, name: 'David Wilson', rating: 4.6, rides: 12, avatar: profileIcon, role: 'Member' },
     { id: 5, name: 'Emma Brown', rating: 4.9, rides: 27, avatar: profileIcon, role: 'Moderator' },
-  ]
-
-  const communities = [
-    { id: 1, name: 'City B Carpoolers', members: 1240, icon: communityIcon, category: 'Location Based' },
-    { id: 2, name: 'Weekend Riders', members: 856, icon: communityIcon, category: 'Activity' },
-    { id: 3, name: 'Eco Warriors', members: 542, icon: communityIcon, category: 'Eco Friendly' },
-    { id: 4, name: 'Office Commute', members: 634, icon: communityIcon, category: 'Commute' },
   ]
 
   const isJoinedCommunity = (communityId) => joinedCommunities.includes(communityId)
@@ -50,11 +45,16 @@ export default function Communities() {
     setShowLeaveDialog(true)
   }
 
-  const confirmLeaveCommunity = () => {
-    setJoinedCommunities(joinedCommunities.filter(id => id !== selectedCommunity.id))
+  const confirmLeaveCommunity = async () => {
+    await leaveCommunity(selectedCommunity._id)
     setShowLeaveDialog(false)
     setSelectedCommunity(null)
     alert(`Left ${selectedCommunity.name}`)
+  }
+
+  const handleJoinCommunity = async (community) => {
+    await joinCommunity(community._id)
+    alert(`Joined ${community.name}`)
   }
 
   const handleCreateCommunity = () => {
@@ -80,50 +80,57 @@ export default function Communities() {
     }))
   }
 
-  const handleCreateCommunitySubmit = () => {
+  const handleCreateCommunitySubmit = async () => {
     if (!newCommunityData.name.trim()) {
       alert('Please enter a community name')
       return
     }
-    if (newCommunityData.selectedFriends.length === 0) {
-      alert('Please select at least one friend to add')
-      return
+
+    try {
+      await api.post('/communities', {
+        name: newCommunityData.name,
+        category: newCommunityData.category || 'Custom',
+        // In a real app, we'd add members here too
+      })
+
+      alert(`Community "${newCommunityData.name}" created!`)
+
+      // Refresh communities list (handled by context or reload)
+      window.location.reload() // Simple reload to refresh data for now
+
+      setNewCommunityData({
+        name: '',
+        category: '',
+        selectedFriends: [],
+      })
+      setShowCreateModal(false)
+    } catch (error) {
+      console.error("Error creating community:", error)
+      alert("Failed to create community")
     }
-    
-    const newCommunity = {
-      id: Math.max(...communities.map(c => c.id), 0) + 1,
-      name: newCommunityData.name,
-      category: newCommunityData.category || 'Custom',
-      members: newCommunityData.selectedFriends.length + 1,
-      icon: communityIcon,
-    }
-    
-    alert(`Community "${newCommunityData.name}" created with ${newCommunityData.selectedFriends.length} member(s)!`)
-    setJoinedCommunities([...joinedCommunities, newCommunity.id])
-    
-    setNewCommunityData({
-      name: '',
-      category: '',
-      selectedFriends: [],
-    })
-    setShowCreateModal(false)
+  }
+
+  const handleMessage = (community) => {
+    setChatType('community')
+    setCurrentChat(community)
+    onNavigate('messages')
   }
 
   return (
     <section>
       <div className="mb-10">
         <h1 className="text-4xl font-bold text-white mb-2">
-           Communities
+          Communities
         </h1>
         <p className="text-gray-400">Join groups and connect with like-minded riders</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
         {communities.map((community) => (
-          <div key={community.id} className="bg-gradient-to-br from-orange-500/10 to-pink-500/10 border border-green-400/30 rounded-2xl p-6 hover:border-green-400/60 transition">
+          <div key={community._id} className="bg-gradient-to-br from-orange-500/10 to-pink-500/10 border border-green-400/30 rounded-2xl p-6 hover:border-green-400/60 transition">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-4">
-                <img src={community.icon} alt={community.name} className="w-16 h-16 object-contain" />
+                <img src={community.icon || communityIcon} alt={community.name} className="w-16 h-16 object-contain" />
                 <div>
                   <p className="text-white font-bold text-lg">{community.name}</p>
                   <p className="text-orange-300 text-sm font-medium">{community.category}</p>
@@ -132,24 +139,38 @@ export default function Communities() {
             </div>
             <div className="flex items-center justify-between py-4 border-t border-white/10">
               <p className="text-gray-400">
-                <span className="text-white font-bold text-lg">{community.members}</span> members
+                <span className="text-white font-bold text-lg">{community.members.length}</span> members
               </p>
               <div className="flex gap-2">
-                <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition text-sm">
-                  💬 Message
-                </button>
-                <button 
-                  onClick={() => handleViewMembers(community)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-semibold transition text-sm"
-                >
-                  Members
-                </button>
-                <button 
-                  onClick={() => handleLeaveCommunity(community)}
-                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition text-sm"
-                >
-                  Leave
-                </button>
+                {isJoinedCommunity(community._id) ? (
+                  <>
+                    <button
+                      onClick={() => handleMessage(community)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition text-sm"
+                    >
+                      💬 Message
+                    </button>
+                    <button
+                      onClick={() => handleViewMembers(community)}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-semibold transition text-sm"
+                    >
+                      Members
+                    </button>
+                    <button
+                      onClick={() => handleLeaveCommunity(community)}
+                      className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition text-sm"
+                    >
+                      Leave
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => handleJoinCommunity(community)}
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition text-sm"
+                  >
+                    Join
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -159,7 +180,7 @@ export default function Communities() {
       {/* Create New Community */}
       <div className="mt-8 bg-white/5 backdrop-blur-lg p-8 rounded-2xl border border-white/10 text-center">
         <p className="text-white font-semibold mb-4">Want to create your own community?</p>
-        <button 
+        <button
           onClick={handleCreateCommunity}
           className="bg-gradient-to-r from-green-500 to-green-500 hover:from-green-600 hover:to-green-600 text-white px-8 py-3 rounded-lg font-bold transition-all hover:shadow-lg"
         >
@@ -179,7 +200,7 @@ export default function Communities() {
               <input
                 type="text"
                 value={newCommunityData.name}
-                onChange={(e) => setNewCommunityData({...newCommunityData, name: e.target.value})}
+                onChange={(e) => setNewCommunityData({ ...newCommunityData, name: e.target.value })}
                 placeholder="e.g., Weekend Bike Riders"
                 className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-green-400"
               />
@@ -190,7 +211,7 @@ export default function Communities() {
               <label className="block text-white font-semibold mb-2">Category</label>
               <select
                 value={newCommunityData.category}
-                onChange={(e) => setNewCommunityData({...newCommunityData, category: e.target.value})}
+                onChange={(e) => setNewCommunityData({ ...newCommunityData, category: e.target.value })}
                 className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-green-400"
               >
                 <option value="">Select Category</option>
@@ -206,15 +227,15 @@ export default function Communities() {
             <div className="mb-6">
               <label className="block text-white font-semibold mb-3">Add Friends to Community</label>
               <div className="bg-white/5 border border-white/10 rounded-lg p-4 max-h-40 overflow-y-auto space-y-2">
-                {allFriends.length === 0 ? (
+                {friends.length === 0 ? (
                   <p className="text-gray-400 text-sm">No friends available</p>
                 ) : (
-                  allFriends.map(friend => (
-                    <label key={friend.id} className="flex items-center gap-3 cursor-pointer hover:bg-white/5 p-2 rounded">
+                  friends.map(friend => (
+                    <label key={friend._id} className="flex items-center gap-3 cursor-pointer hover:bg-white/5 p-2 rounded">
                       <input
                         type="checkbox"
-                        checked={newCommunityData.selectedFriends.includes(friend.id)}
-                        onChange={() => handleAddFriendToCommunity(friend.id)}
+                        checked={newCommunityData.selectedFriends.includes(friend._id)}
+                        onChange={() => handleAddFriendToCommunity(friend._id)}
                         className="w-4 h-4 cursor-pointer"
                       />
                       <span className="text-gray-300 text-sm">{friend.name}</span>
@@ -284,7 +305,7 @@ export default function Communities() {
                       <p className="text-xs text-blue-400">{member.role}</p>
                     </div>
                   </div>
-                  <button 
+                  <button
                     onClick={() => handleViewMemberProfile(member)}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-sm font-medium transition"
                   >
@@ -352,4 +373,3 @@ export default function Communities() {
     </section>
   )
 }
-

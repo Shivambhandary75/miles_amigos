@@ -2,7 +2,7 @@ const express = require('express')
 const dotenv = require('dotenv')
 const connectDB = require('./src/config/db')
 const userRoutes = require('./src/routes/userRoutes')
-const cors=require('cors')
+const cors = require('cors')
 const http = require('http')
 const socketIO = require('socket.io')
 dotenv.config()
@@ -21,9 +21,9 @@ app.set('io', io)
 
 // Request logging middleware
 app.use((req, res, next) => {
-    console.log(`\n[${new Date().toISOString()}] ${req.method} ${req.path}`)
-    console.log('Headers:', req.headers.authorization ? 'Token present' : 'No token')
-    next()
+  console.log(`\n[${new Date().toISOString()}] ${req.method} ${req.path}`)
+  console.log('Headers:', req.headers.authorization ? 'Token present' : 'No token')
+  next()
 })
 
 // middlewares
@@ -34,11 +34,11 @@ app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 // log raw body when JSON parsing fails
 app.use((err, req, res, next) => {
-    if (err && err.type === 'entity.parse.failed') {
-        console.error('JSON parse error - raw body:\n', req.rawBody)
-        return res.status(400).send('Invalid JSON')
-    }
-    next(err)
+  if (err && err.type === 'entity.parse.failed') {
+    console.error('JSON parse error - raw body:\n', req.rawBody)
+    return res.status(400).send('Invalid JSON')
+  }
+  next(err)
 })
 
 // routes
@@ -51,6 +51,14 @@ app.use('/api/rides', rideRoutes)
 // Geocoding proxy
 const geocodeRoutes = require('./src/routes/geocodeRoutes')
 app.use('/api/geocode', geocodeRoutes)
+
+// Message routes
+const messageRoutes = require('./src/routes/messageRoutes')
+app.use('/api/messages', messageRoutes)
+
+// Community routes
+const communityRoutes = require('./src/routes/communityRoutes')
+app.use('/api/communities', communityRoutes)
 
 // Socket.IO live location tracking
 const liveLocations = new Map() // Store live locations: { rideId: { driver: {lat, lng, userId}, passengers: [{lat, lng, userId}] } }
@@ -67,7 +75,7 @@ io.on('connection', (socket) => {
   socket.on('join-ride', ({ rideId, userId, role }) => {
     const roomName = `ride-${rideId}`
     socket.join(roomName)
-    
+
     console.log(`========================================`)
     console.log(`🚪 [SOCKET] User joined ride room`)
     console.log(`========================================`)
@@ -92,7 +100,7 @@ io.on('connection', (socket) => {
   // Update user location
   socket.on('location-update', ({ rideId, userId, role, lat, lng }) => {
     const roomName = `ride-${rideId}`
-    
+
     console.log(`========================================`)
     console.log(`📍 [SOCKET] Location update received`)
     console.log(`========================================`)
@@ -105,10 +113,10 @@ io.on('connection', (socket) => {
     console.log(`Coordinates: [${lng}, ${lat}]`)
     console.log(`Room: ${roomName}`)
     console.log(`Time: ${new Date().toLocaleTimeString()}`)
-    
+
     if (liveLocations.has(rideId)) {
       const rideData = liveLocations.get(rideId)
-      
+
       if (role === 'driver') {
         rideData.driver = { userId, lat, lng }
         console.log(`✅ Updated driver location`)
@@ -122,7 +130,7 @@ io.on('connection', (socket) => {
           console.log(`✅ Added new passenger location (${rideData.passengers.length} total)`)
         }
       }
-      
+
       console.log(`📊 Current ride state:`)
       console.log(`   Driver: ${rideData.driver ? `Present at [${rideData.driver.lng}, ${rideData.driver.lat}]` : 'Not present'}`)
       console.log(`   Passengers: ${rideData.passengers.length}`)
@@ -132,7 +140,7 @@ io.on('connection', (socket) => {
       console.log(`========================================`)
       console.log(`📤 Broadcasting to room: ${roomName}`)
       console.log(`========================================\n`)
-      
+
       // Broadcast updated locations to all users in this ride
       io.to(roomName).emit('locations-update', rideData)
     } else {
@@ -145,7 +153,7 @@ io.on('connection', (socket) => {
   socket.on('leave-ride', ({ rideId, userId }) => {
     const roomName = `ride-${rideId}`
     socket.leave(roomName)
-    
+
     console.log(`========================================`)
     console.log(`👋 [SOCKET] User left ride`)
     console.log(`========================================`)
@@ -158,7 +166,7 @@ io.on('connection', (socket) => {
     if (liveLocations.has(rideId)) {
       const rideData = liveLocations.get(rideId)
       rideData.passengers = rideData.passengers.filter(p => p.userId !== userId)
-      
+
       if (!rideData.driver && rideData.passengers.length === 0) {
         liveLocations.delete(rideId)
         console.log(`🧹 Cleaned up location storage for ride: ${rideId}`)
@@ -180,8 +188,8 @@ io.on('connection', (socket) => {
 // connect to DB and start server
 const PORT = process.env.PORT || 5000
 connectDB().then(() => {
-    server.listen(PORT, () => {
-        console.log('Server running on port', PORT)
-    })
+  server.listen(PORT, () => {
+    console.log('Server running on port', PORT)
+  })
 })
 
