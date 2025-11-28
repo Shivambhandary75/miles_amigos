@@ -21,6 +21,7 @@ export default function Friends() {
     notes: '',
   })
   const [showBookingConfirm, setShowBookingConfirm] = useState(false)
+  const [showBlockDialog, setShowBlockDialog] = useState(false)
 
   useEffect(() => {
     fetchFriends()
@@ -90,6 +91,25 @@ export default function Friends() {
     }
   }
 
+  const handleBlockClick = (friend) => {
+    setSelectedFriend(friend)
+    setShowBlockDialog(true)
+  }
+
+  const confirmBlockUser = async () => {
+    if (!selectedFriend) return;
+    try {
+      await api.post(`/users/${selectedFriend._id || selectedFriend.id}/block`);
+      setFriends(friends.filter(f => (f._id || f.id) !== (selectedFriend._id || selectedFriend.id)));
+      setShowBlockDialog(false);
+      alert(`${selectedFriend.name} has been blocked. You won't see their rides and they won't see yours.`);
+      setSelectedFriend(null);
+    } catch (err) {
+      console.error('Error blocking user:', err);
+      alert('Failed to block user.');
+    }
+  }
+
   return (
     <section>
       <div className="mb-10">
@@ -109,56 +129,64 @@ export default function Friends() {
           <p className="text-gray-500 text-sm">Complete rides and rate your drivers to build your friends list!</p>
         </div>
       ) : (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {friends.map((friend) => (
-          <div key={friend._id || friend.id} className="bg-white/5 backdrop-blur-lg p-6 rounded-2xl border border-white/10 hover:border-purple-500/30 transition">
-            <div className="flex items-center gap-4 mb-4">
-              <img src={friend.avatar || profileIcon} alt={friend.name} className="w-16 h-16 rounded-full object-cover" />
-              <div className="flex-1">
-                <p className="text-white font-bold">{friend.name}</p>
-                <p className="text-sm text-gray-400">Driver</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4 py-4 border-t border-white/10">
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-1 text-2xl font-bold text-yellow-400 mb-1">
-                  <img src={ratingIcon} alt="Rating" className="w-5 h-5" /> {(friend.rating || 0).toFixed(1)}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {friends.map((friend) => (
+            <div key={friend._id || friend.id} className="bg-white/5 backdrop-blur-lg p-6 rounded-2xl border border-white/10 hover:border-purple-500/30 transition">
+              <div className="flex items-center gap-4 mb-4">
+                <img src={friend.avatar || profileIcon} alt={friend.name} className="w-16 h-16 rounded-full object-cover" />
+                <div className="flex-1">
+                  <p className="text-white font-bold">{friend.name}</p>
+                  <p className="text-sm text-gray-400">Driver</p>
                 </div>
-                <p className="text-xs text-gray-400">Rating</p>
               </div>
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-1 text-2xl font-bold text-green-400 mb-1">
-                  <img src={carIcon} alt="Rides" className="w-5 h-5" /> {friend.rides || 0}
+              <div className="grid grid-cols-2 gap-4 py-4 border-t border-white/10">
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-1 text-2xl font-bold text-yellow-400 mb-1">
+                    <img src={ratingIcon} alt="Rating" className="w-5 h-5" /> {(friend.rating || 0).toFixed(1)}
+                  </div>
+                  <p className="text-xs text-gray-400">Rating</p>
                 </div>
-                <p className="text-xs text-gray-400">Rides</p>
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-1 text-2xl font-bold text-green-400 mb-1">
+                    <img src={carIcon} alt="Rides" className="w-5 h-5" /> {friend.rides || 0}
+                  </div>
+                  <p className="text-xs text-gray-400">Rides</p>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-4">
+                <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition">
+                  Message
+                </button>
+                <button
+                  onClick={() => handleBookRide(friend)}
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg font-medium transition"
+                >
+                  Book Ride
+                </button>
+                <button
+                  onClick={() => handleViewProfile(friend)}
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-medium transition"
+                >
+                  Profile
+                </button>
+              </div>
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => handleBlockClick(friend)}
+                  className="flex-1 bg-orange-600 hover:bg-orange-700 text-white py-2 rounded-lg font-medium transition"
+                >
+                  Block
+                </button>
+                <button
+                  onClick={() => handleDeleteClick(friend)}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-medium transition"
+                >
+                  Delete
+                </button>
               </div>
             </div>
-            <div className="flex gap-2 mt-4">
-              <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition">
-                Message
-              </button>
-              <button 
-                onClick={() => handleBookRide(friend)}
-                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg font-medium transition"
-              >
-                Book Ride
-              </button>
-              <button 
-                onClick={() => handleViewProfile(friend)}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-medium transition"
-              >
-                Profile
-              </button>
-              <button 
-                onClick={() => handleDeleteClick(friend)}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-medium transition"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
       )}
 
       {/* Delete Friend Dialog */}
@@ -172,6 +200,21 @@ export default function Friends() {
         onConfirm={confirmDeleteFriend}
         onCancel={() => {
           setShowDeleteDialog(false)
+          setSelectedFriend(null)
+        }}
+      />
+
+      {/* Block User Dialog */}
+      <ConfirmationDialog
+        isOpen={showBlockDialog}
+        title="Block User"
+        message={selectedFriend ? `Are you sure you want to block ${selectedFriend.name}? You won't see their rides and they won't see yours. You can unblock them later from settings.` : ''}
+        confirmText="Block"
+        cancelText="Cancel"
+        isDangerous={true}
+        onConfirm={confirmBlockUser}
+        onCancel={() => {
+          setShowBlockDialog(false)
           setSelectedFriend(null)
         }}
       />

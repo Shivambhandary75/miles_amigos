@@ -67,6 +67,11 @@ const UserSchema = new mongoose.Schema({
         ref: "User"
     }],
 
+    blockedUsers: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
+    }],
+
     notifications: [new mongoose.Schema({
         icon: String,
         title: String,

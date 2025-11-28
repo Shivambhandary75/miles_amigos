@@ -30,8 +30,9 @@ export default function LiveMap() {
 
   // Helper: extract [lng, lat]
   const getCoords = (loc) => {
-    if (!loc) return [77.6245, 12.9352]
-    return [loc.lng ?? 77.6245, loc.lat ?? 12.9352]
+    if (!loc) return null
+    if (typeof loc.lng !== 'number' || typeof loc.lat !== 'number') return null
+    return [loc.lng, loc.lat]
   }
 
   // Initialize Socket.IO and get user ID
@@ -166,8 +167,11 @@ export default function LiveMap() {
   }, [currentRide, userId, userRole])
 
   useEffect(() => {
-    fetchAcceptedRides()
-  }, [])
+    if (userId) {
+      console.log('👤 [LiveMap] User ID set, fetching rides...')
+      fetchAcceptedRides()
+    }
+  }, [userId])
 
   // Log whenever passengerPoints changes
   useEffect(() => {
@@ -495,7 +499,7 @@ export default function LiveMap() {
   }
 
   // Build markers for map
-  const driverMarkers = currentRide ? [
+  const driverMarkers = currentRide && currentRide.startCoords ? [
     {
       title: "Start",
       description: userRole === "driver"

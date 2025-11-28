@@ -1,6 +1,6 @@
 const express = require('express')
 const router = express.Router()
-const { Register, Login, getProfile, updateUserProfile, getNotifications, getUserStats, confirmRideCompletion, addFriend, getFriends, deleteFriend } = require('../controllers/userController')
+const { Register, Login, getProfile, updateUserProfile, getNotifications, getUserStats, confirmRideCompletion, addFriend, getFriends, deleteFriend, blockUser, unblockUser, getBlockedUsers } = require('../controllers/userController')
 const { protect } = require('../middlewares/authMiddleware')
 
 // POST /api/users/register
@@ -37,5 +37,14 @@ router.get('/friends', protect, getFriends);
 
 // DELETE /api/users/friends/:friendId (protected)
 router.delete('/friends/:friendId', protect, deleteFriend);
+
+// POST /api/users/:id/block (protected)
+router.post('/:id/block', protect, blockUser);
+
+// POST /api/users/:id/unblock (protected)
+router.post('/:id/unblock', protect, unblockUser);
+
+// GET /api/users/blocked (protected)
+router.get('/blocked', protect, getBlockedUsers);
 
 module.exports = router

@@ -1,4 +1,5 @@
 const Ride = require("../models/Ride");
+const User = require("../models/User");
 const turf = require("@turf/turf");
 
 // Check if a point is within maxDistance of closest route point
@@ -70,11 +71,24 @@ exports.searchRides = async (req, res) => {
             dateFilter = { $gte: effectiveStart, $lte: endOfDay };
         }
 
+        // Fetch blocked users logic
+        const currentUser = await User.findById(req.user.id);
+        // Users who have blocked the current user
+        const blockers = await User.find({ blockedUsers: req.user.id }).select('_id');
+
+        const blockedDriverIds = [
+            ...(currentUser.blockedUsers || []),
+            ...blockers.map(u => u._id)
+        ];
+
+        console.log(`🚫 [SEARCH] Excluding ${blockedDriverIds.length} blocked drivers`);
+
         // Fetch rides matching criteria
         const rides = await Ride.find({
             departureTime: dateFilter,
             availableSeats: { $gt: 0 },
-            status: { $ne: 'cancelled' }
+            status: { $ne: 'cancelled' },
+            driver: { $nin: blockedDriverIds }
         }).populate("driver", "name Rating email");
 
         console.log(`✅ [SEARCH] Found ${rides.length} available rides matching criteria`);

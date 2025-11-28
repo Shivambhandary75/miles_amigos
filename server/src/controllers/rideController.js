@@ -1,6 +1,7 @@
 const Ride = require('../models/Ride');
 const User = require('../models/User');
 const { haversineDistance, getRoute } = require('../utils/mapRouting');
+const jwt = require('jsonwebtoken');
 
 // @desc    Create a new ride
 // @route   POST /api/rides
@@ -121,6 +122,27 @@ const findRides = async (req, res) => {
             { status: 'in-progress' }
         ];
         query.availableSeats = { $gt: 0 }; // Only rides with available seats
+
+        // Optional: Filter blocked users if token is present
+        if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+            try {
+                const token = req.headers.authorization.split(' ')[1];
+                const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                const userId = decoded.id;
+
+                const currentUser = await User.findById(userId);
+                if (currentUser) {
+                    const blockers = await User.find({ blockedUsers: userId }).select('_id');
+                    const blockedDriverIds = [
+                        ...(currentUser.blockedUsers || []),
+                        ...blockers.map(u => u._id)
+                    ];
+                    query.driver = { $nin: blockedDriverIds };
+                }
+            } catch (err) {
+                console.warn('[findRides] Invalid token, skipping blocked user filter');
+            }
+        }
 
         const rides = await Ride.find(query).populate('driver', 'name Rating');
         res.json(rides);
