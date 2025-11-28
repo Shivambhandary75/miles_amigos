@@ -9,5 +9,10 @@ export async function getRoute(startCoords, endCoords) {
 
   if (!data.routes || data.routes.length === 0) return null;
 
-  return data.routes[0].geometry.coordinates; // polyline array
+  const route = data.routes[0];
+  return {
+    coordinates: route.geometry.coordinates, // polyline array
+    distance: route.distance / 1000, // Convert to km
+    duration: Math.round(route.duration / 60) // Convert to minutes
+  };
 }

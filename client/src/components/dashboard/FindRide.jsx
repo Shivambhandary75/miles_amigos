@@ -7,9 +7,6 @@ import { geocodeAddress, searchLocations, haversineDistance } from '../../utils/
 import api from '../../utils/api'
 
 export default function FindRide() {
-  // Rides fetched from backend
-  const [allRides, setAllRides] = useState([])
-
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [date, setDate] = useState('')
@@ -27,18 +24,11 @@ export default function FindRide() {
   const [toSuggestions, setToSuggestions] = useState([])
 
   // Fetch all rides from backend on mount
-  useEffect(() => {
-    async function fetchRides() {
-      try {
-        const res = await api.get('/rides')
-        setAllRides(res.data)
-        setResults(res.data)
-      } catch (err) {
-        console.error('Error fetching rides:', err)
-      }
-    }
-    fetchRides()
-  }, [])
+  // Rides fetched from backend
+  // const [allRides, setAllRides] = useState([]) // No longer needed
+
+  // Remove initial fetch
+  // useEffect(() => { ... }, [])
 
   // Geocode "from" location
   useEffect(() => {
@@ -100,91 +90,70 @@ export default function FindRide() {
   }
 
   // Filter rides by matching route (start/end within 2km)
-const handleSearch = async (e) => {
-  e.preventDefault();
+  const handleSearch = async (e) => {
+    e.preventDefault();
 
-  console.log('\n========================================');
-  console.log('🔍 [FIND RIDE] Starting search...');
-  console.log('========================================');
+    console.log('\n========================================');
+    console.log('🔍 [FIND RIDE] Starting search...');
+    console.log('========================================');
 
-  if (!startCoords || !endCoords) {
-    console.error('❌ [FIND RIDE] Missing coordinates');
-    alert("Please enter valid pickup and drop locations.");
-    return;
-  }
+    if (!startCoords || !endCoords) {
+      console.error('❌ [FIND RIDE] Missing coordinates');
+      alert("Please enter valid pickup and drop locations.");
+      return;
+    }
 
-  console.log('📍 [FIND RIDE] Search parameters:');
-  console.log(`  From: ${from}`);
-  console.log(`  From Coords: [${startCoords[0]}, ${startCoords[1]}]`);
-  console.log(`  To: ${to}`);
-  console.log(`  To Coords: [${endCoords[0]}, ${endCoords[1]}]`);
+    console.log('📍 [FIND RIDE] Search parameters:');
+    console.log(`  From: ${from}`);
+    console.log(`  From Coords: [${startCoords[0]}, ${startCoords[1]}]`);
+    console.log(`  To: ${to}`);
+    console.log(`  To Coords: [${endCoords[0]}, ${endCoords[1]}]`);
 
-  try {
-    console.log('📤 [FIND RIDE] Sending search request to server...');
-    const res = await api.post('/rides/search', {
-      pickup: {
-        lat: startCoords[1],
-        lng: startCoords[0]
-      },
-      drop: {
-        lat: endCoords[1],
-        lng: endCoords[0]
-      }
-    });
-
-    console.log('✅ [FIND RIDE] Response received:');
-    console.log(`  Status: ${res.status}`);
-    console.log(`  Total matches: ${res.data.matches?.length || 0}`);
-    console.log(`  Full response:`, res.data);
-    
-    if (res.data.matches && res.data.matches.length > 0) {
-      console.log('🚗 [FIND RIDE] Matched rides:');
-      res.data.matches.forEach((ride, idx) => {
-        console.log(`  ${idx + 1}. Ride ID: ${ride._id || ride.rideId}`);
-        console.log(`     Driver: ${ride.driver?.name}`);
-        console.log(`     From: ${ride.startLocation?.name} [${ride.startLocation?.lng}, ${ride.startLocation?.lat}]`);
-        console.log(`     To: ${ride.endLocation?.name} [${ride.endLocation?.lng}, ${ride.endLocation?.lat}]`);
-        console.log(`     Seats: ${ride.availableSeats}`);
-        console.log(`     Price: ₹${ride.price}`);
+    try {
+      console.log('📤 [FIND RIDE] Sending search request to server...');
+      const res = await api.post('/rides/search', {
+        pickup: {
+          lat: startCoords[1],
+          lng: startCoords[0]
+        },
+        drop: {
+          lat: endCoords[1],
+          lng: endCoords[0]
+        },
+        date: date // Add date to payload
       });
-    } else {
-      console.log('⚠️  [FIND RIDE] No rides found matching search criteria');
-      console.log('   Server response:', JSON.stringify(res.data, null, 2));
+
+      console.log('✅ [FIND RIDE] Response received:');
+      console.log(`  Status: ${res.status}`);
+      console.log(`  Total matches: ${res.data.matches?.length || 0}`);
+      console.log(`  Full response:`, res.data);
+
+      if (res.data.matches && res.data.matches.length > 0) {
+        console.log('🚗 [FIND RIDE] Matched rides:');
+        res.data.matches.forEach((ride, idx) => {
+          console.log(`  ${idx + 1}. Ride ID: ${ride._id || ride.rideId}`);
+          console.log(`     Driver: ${ride.driver?.name}`);
+          console.log(`     From: ${ride.startLocation?.name} [${ride.startLocation?.lng}, ${ride.startLocation?.lat}]`);
+          console.log(`     To: ${ride.endLocation?.name} [${ride.endLocation?.lng}, ${ride.endLocation?.lat}]`);
+          console.log(`     Seats: ${ride.availableSeats}`);
+          console.log(`     Price: ₹${ride.price}`);
+        });
+      } else {
+        console.log('⚠️  [FIND RIDE] No rides found matching search criteria');
+        console.log('   Server response:', JSON.stringify(res.data, null, 2));
+      }
+
+      setResults(res.data.matches || []);
+      console.log('========================================\n');
+    } catch (err) {
+      console.error('❌ [FIND RIDE] Error searching rides:');
+      console.error('  Error:', err.message);
+      console.error('  Status:', err.response?.status);
+      console.error('  Response data:', err.response?.data);
+      console.error('  Full error:', err);
+      alert("Failed to search rides. Try again.");
     }
-
-    setResults(res.data.matches || []);
-    console.log('========================================\n');
-  } catch (err) {
-    console.error('❌ [FIND RIDE] Error searching rides:');
-    console.error('  Error:', err.message);
-    console.error('  Status:', err.response?.status);
-    console.error('  Response data:', err.response?.data);
-    console.error('  Full error:', err);
-    alert("Failed to search rides. Try again.");
-  }
-};
-
-
-  // Geocode all rides' start/end locations when rides are loaded
-  useEffect(() => {
-    async function geocodeRides() {
-      const ridesWithCoords = await Promise.all(
-        allRides.map(async r => {
-          let _startCoords = null, _endCoords = null
-          try {
-            const startRes = await geocodeAddress(r.startLocation)
-            if (startRes) _startCoords = [startRes.longitude, startRes.latitude]
-            const endRes = await geocodeAddress(r.endLocation)
-            if (endRes) _endCoords = [endRes.longitude, endRes.latitude]
-          } catch {}
-          return { ...r, _startCoords, _endCoords }
-        })
-      )
-      setAllRides(ridesWithCoords)
-      setResults(ridesWithCoords)
-    }
-    if (allRides.length > 0) geocodeRides()
-  }, [allRides.length])
+  };
 
   const handleBookClick = (ride) => {
     console.log('\n========================================');
@@ -209,7 +178,7 @@ const handleSearch = async (e) => {
       alert('Please enter valid pickup and drop locations.');
       return;
     }
-    
+
     // Get the ride ID (Mongoose uses _id by default)
     const rideId = selectedRide.rideId;
     console.log("ride id is ", rideId);
@@ -217,7 +186,7 @@ const handleSearch = async (e) => {
       alert('Ride ID not found. Please try again.');
       return;
     }
-    
+
     setIsBooking(true);
     try {
       // Send booking request to backend
@@ -254,7 +223,7 @@ const handleSearch = async (e) => {
       <ConfirmationDialog
         isOpen={showBookDialog}
         title="Confirm Booking"
-        message={selectedRide ? `Book ride with ${selectedRide.driver.name} from "${from}" to "${to}" for ₹${selectedRide.price}?` : ''}
+        message={selectedRide ? `Book ride with ${selectedRide.driver?.name} from "${from}" to "${to}" for ₹${selectedRide.estimatedPrice || selectedRide.price}?` : ''}
         confirmText="Book Now"
         cancelText="Cancel"
         isDangerous={false}
@@ -360,7 +329,7 @@ const handleSearch = async (e) => {
         <div>
           <div className="bg-white/5 backdrop-blur-lg p-6 rounded-2xl border border-white/10 h-fit sticky top-8">
             <h3 className="text-lg font-bold text-white mb-4"> Route Preview</h3>
-            
+
             <div className="rounded-lg overflow-hidden border border-white/10 mb-4" style={{ height: '400px' }}>
               <LeafletMapComponent
                 startLocation={startCoords || null}
@@ -403,43 +372,60 @@ const handleSearch = async (e) => {
       <div>
         <h2 className="text-2xl font-bold text-white mb-6">Available Rides</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {results.map((ride, idx) => (
-    <div key={idx} className="bg-white/5 backdrop-blur-lg p-6 rounded-xl border border-white/10 hover:border-blue-500/30 transition">
-  <div className="flex justify-between items-start mb-4">
-    <div>
-      <p className="text-lg font-bold text-white">
-        {ride.driver?.name}'s Ride
-      </p>
-      <p className="text-gray-400 text-sm">
-        Seats: {ride.availableSeats}
-      </p>
-      <p className="text-gray-400 text-sm">
-        Departure: {new Date(ride.departureTime).toLocaleString()}
-      </p>
-    </div>
+          {results.map((ride, idx) => {
+            // Calculate estimated price if search coords are available
+            let displayPrice = ride.price;
+            let priceLabel = "Base Rate";
 
-    <span className="text-2xl flex items-center gap-1">
-      <img src={ratingIcon} alt="Rating" className="w-6 h-6" />
-      {ride.driver?.Rating || "—"}
-    </span>
-  </div>
+            if (startCoords && endCoords) {
+              const dist = haversineDistance(
+                [startCoords[1], startCoords[0]],
+                [endCoords[1], endCoords[0]]
+              );
+              displayPrice = Math.ceil(dist * 15);
+              priceLabel = `Est. for ${dist.toFixed(1)} km`;
+            } else {
+              displayPrice = "15/km";
+              priceLabel = "Rate";
+            }
 
-  <div className="flex justify-between items-center py-4 border-t border-white/10">
-    <div className="flex gap-4">
-      <span className="text-green-400 font-bold">₹{ride.price}</span>
-      <span className="text-gray-400">{ride.availableSeats} seats</span>
-    </div>
+            return (
+              <div key={idx} className="bg-white/5 backdrop-blur-lg p-6 rounded-xl border border-white/10 hover:border-blue-500/30 transition">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <p className="text-lg font-bold text-white">
+                      {ride.driver?.name}'s Ride
+                    </p>
+                    <p className="text-gray-400 text-sm">
+                      Seats: {ride.availableSeats}
+                    </p>
+                    <p className="text-gray-400 text-sm">
+                      Departure: {new Date(ride.departureTime).toLocaleString()}
+                    </p>
+                  </div>
 
-    <button
-      onClick={() => handleBookClick(ride)}
-      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition"
-    >
-      Book
-    </button>
-  </div>
-</div>
+                  <span className="text-2xl flex items-center gap-1">
+                    <img src={ratingIcon} alt="Rating" className="w-6 h-6" />
+                    {ride.driver?.Rating || "—"}
+                  </span>
+                </div>
 
-          ))}
+                <div className="flex justify-between items-center py-4 border-t border-white/10">
+                  <div className="flex flex-col">
+                    <span className="text-green-400 font-bold text-xl">₹{displayPrice}</span>
+                    <span className="text-gray-500 text-xs">{priceLabel}</span>
+                  </div>
+
+                  <button
+                    onClick={() => handleBookClick({ ...ride, estimatedPrice: displayPrice })}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition"
+                  >
+                    Book
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>

@@ -103,6 +103,17 @@ const RideSchema = new mongoose.Schema({
         comment: {
             type: String,
             default: ''
+        },
+        driverRating: {
+            type: Number,
+            min: 1,
+            max: 5,
+            default: null
+        },
+        price: {
+            type: Number,
+            required: true,
+            default: 0
         }
     }]
 

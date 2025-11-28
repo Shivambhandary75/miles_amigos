@@ -177,7 +177,12 @@ export default function LiveMap() {
       setPassengerRides(passengerRidesData)
 
       // Decide current ride
+      console.log('🎭 [ROLE] Determining user role...')
+      console.log('  Driver rides:', driverRides.length)
+      console.log('  Passenger rides:', passengerRidesData.length)
+
       if (driverRides.length > 0) {
+        console.log('  ✅ User is DRIVER')
         setUserRole("driver")
 
         const ride = driverRides[0] // top-most active ride
@@ -237,8 +242,18 @@ export default function LiveMap() {
 
         const ride = passengerRidesData[0]
 
+        console.log('🚶 [PASSENGER] Processing passenger ride:')
+        console.log('  User ID:', userId)
+        console.log('  Ride passengers:', ride.passengers)
+
         // For passenger, get their actual pickup/drop location from the passengers array
-        const passengerEntry = ride.passengers?.find(p => p.user === userId || p.user?._id === userId)
+        const passengerEntry = ride.passengers?.find(p => {
+          const pUserId = p.user?._id || p.user
+          console.log('  Checking passenger:', pUserId, 'vs', userId)
+          return pUserId === userId || p.user === userId
+        })
+
+        console.log('  Found passenger entry:', passengerEntry)
 
         const newCurrentRide = {
           id: ride.id,
@@ -264,6 +279,7 @@ export default function LiveMap() {
         }
 
         // Fetch dual paths for this ride
+        console.log('  Calling fetchDualPaths with passengerEntry:', passengerEntry)
         await fetchDualPaths(ride, passengerEntry)
 
       } else {
@@ -285,23 +301,37 @@ export default function LiveMap() {
 
   const fetchDualPaths = async (ride, passengerEntry = null) => {
     try {
+      console.log('🛣️ [DUAL PATHS] Fetching dual paths...')
+      console.log('  Passenger Entry:', passengerEntry)
+
       // Get driver's path (start to end of ride)
       const driverStart = getCoords(ride.from)
       const driverEnd = getCoords(ride.to)
+      console.log('  Driver route:', driverStart, '->', driverEnd)
       const driverRoute = await getRoute(driverStart, driverEnd)
+      console.log('  Driver route coordinates:', driverRoute?.coordinates?.length || 0, 'points')
 
       // Get passenger's path if available
       let passengerRoute = null
       if (passengerEntry) {
         const passengerStart = getCoords(passengerEntry.startLocation)
         const passengerEnd = getCoords(passengerEntry.endLocation)
+        console.log('  Passenger route:', passengerStart, '->', passengerEnd)
         passengerRoute = await getRoute(passengerStart, passengerEnd)
+        console.log('  Passenger route coordinates:', passengerRoute?.coordinates?.length || 0, 'points')
+      } else {
+        console.log('  ⚠️ No passenger entry - passenger route will not be displayed')
       }
 
-      setDualPaths({
+      const paths = {
         driver: driverRoute?.coordinates || [],
         passenger: passengerRoute?.coordinates || []
+      }
+      console.log('  Setting dual paths:', {
+        driverPoints: paths.driver.length,
+        passengerPoints: paths.passenger.length
       })
+      setDualPaths(paths)
     } catch (err) {
       console.error('Error fetching dual paths:', err)
     }
@@ -567,8 +597,8 @@ export default function LiveMap() {
                   key={server}
                   onClick={() => handleTileServerChange(server)}
                   className={`px-3 py-1 rounded text-xs ${selectedTileServer === server
-                      ? "bg-blue-600 text-white"
-                      : "bg-white/20 text-gray-200"
+                    ? "bg-blue-600 text-white"
+                    : "bg-white/20 text-gray-200"
                     }`}
                 >
                   {server}

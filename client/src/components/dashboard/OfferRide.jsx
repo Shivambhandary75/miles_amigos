@@ -34,6 +34,7 @@ export default function OfferRide() {
   const [toSuggestions, setToSuggestions] = useState([])
   const { setLiveRides } = useApp(); // Use setLiveRides from AppContext
   const [mapError, setMapError] = useState(null);
+  const [routeDetails, setRouteDetails] = useState(null);
   const navigate = useNavigate(); // Initialize useNavigate
 
   // Fetch ride requests
@@ -118,126 +119,149 @@ export default function OfferRide() {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    setShowConfirmDialog(true)
-  }
 
-const confirmPostRide = async () => {
-  console.log('========================================');
-  console.log('🚗 [OFFER RIDE] Starting ride posting...');
-  console.log('========================================');
-  
-  if (!startCoords || !endCoords) {
-    console.error('❌ [OFFER RIDE] Missing coordinates:', { startCoords, endCoords });
-    alert("Please select valid locations.");
-    return;
-  }
-
-  console.log('📍 [OFFER RIDE] Coordinates obtained:');
-  console.log(`  From: [${startCoords[0]}, ${startCoords[1]}] - ${formData.from}`);
-  console.log(`  To: [${endCoords[0]}, ${endCoords[1]}] - ${formData.to}`);
-
-  setIsPosting(true);
-
-  try {
-    // 1. Fetch driver route polyline
-    console.log('🗺️ [OFFER RIDE] Fetching route polyline...');
-    const routePolyline = await getRoute(startCoords, endCoords);
-
-    if (!routePolyline) {
-      console.error('❌ [OFFER RIDE] Failed to fetch route');
-      alert("Could not fetch route. Try again.");
+    if (!startCoords || !endCoords) {
+      alert("Please select valid locations.");
       return;
     }
 
-    console.log('✅ [OFFER RIDE] Route polyline obtained:');
-    console.log(`  Waypoints: ${routePolyline.length}`);
-    console.log(`  First point: [${routePolyline[0][0]}, ${routePolyline[0][1]}]`);
-    console.log(`  Last point: [${routePolyline[routePolyline.length-1][0]}, ${routePolyline[routePolyline.length-1][1]}]`);
+    setIsPosting(true);
+    try {
+      const data = await getRoute(startCoords, endCoords);
+      if (!data) {
+        alert("Could not calculate route. Please try again.");
+        return;
+      }
 
-    // 2. Build GeoJSON
-    const routeGeoJSON = {
-      type: "LineString",
-      coordinates: routePolyline
-    };
-
-    // 3. Build ride data
-    const rideData = {
-      startLocation: {
-        name: formData.from,
-        lat: startCoords[1],
-        lng: startCoords[0]
-      },
-      endLocation: {
-        name: formData.to,
-        lat: endCoords[1],
-        lng: endCoords[0]
-      },
-      departureTime: formData.datetime,
-      availableSeats: formData.seats,
-      price: formData.price,
-      notes: formData.notes,
-      routePolyline,
-      routeGeoJSON
-    };
-
-    console.log('📤 [OFFER RIDE] Sending ride data to server:');
-    console.log(`  From: ${rideData.startLocation.name}`);
-    console.log(`  From Coords: [${rideData.startLocation.lng}, ${rideData.startLocation.lat}]`);
-    console.log(`  To: ${rideData.endLocation.name}`);
-    console.log(`  To Coords: [${rideData.endLocation.lng}, ${rideData.endLocation.lat}]`);
-    console.log(`  Date: ${rideData.departureTime}`);
-    console.log(`  Seats: ${rideData.availableSeats}`);
-    console.log(`  Price: ₹${rideData.price}`);
-    console.log(`  Route points: ${routePolyline.length}`);
-
-    // 4. Send full ride data to backend
-    const res = await api.post('/rides', rideData);
-
-    console.log('✅ [OFFER RIDE] Response received from server:');
-    console.log(`  Status: ${res.status}`);
-    console.log(`  Ride ID: ${res.data._id}`);
-
-    if (res.status === 201) {
-      console.log('🎉 [OFFER RIDE] Ride created successfully!');
-      
-      // Instead of addRide, re-fetch all live rides to ensure consistency
-      console.log('🔄 [OFFER RIDE] Refreshing live rides list...');
-      const updatedLiveRides = await api.get('/rides');
-      console.log(`✅ [OFFER RIDE] Live rides refreshed. Total rides: ${updatedLiveRides.data.length}`);
-      
-      setLiveRides(updatedLiveRides.data);
-
-      alert("Ride posted successfully!");
-
-      setFormData({
-        from: "",
-        to: "",
-        datetime: "",
-        seats: 1,
-        price: "",
-        notes: "",
-      });
-      console.log('📋 [OFFER RIDE] Form cleared and navigating to map...');
-      navigate('/dashboard?section=map'); // Navigate to Live Map section
-    } else {
-      console.error(`❌ [OFFER RIDE] Unexpected status code: ${res.status}`);
-      alert("Failed to post ride.");
+      setRouteDetails(data);
+      // Calculate price based on distance (consistent with server logic approx)
+      const calculatedPrice = Math.ceil(data.distance * 15);
+      setFormData(prev => ({ ...prev, price: calculatedPrice }));
+      setShowConfirmDialog(true);
+    } catch (error) {
+      console.error("Error calculating route:", error);
+      alert("Failed to calculate route.");
+    } finally {
+      setIsPosting(false);
     }
-  } catch (error) {
-    console.error('❌ [OFFER RIDE] Error during ride posting:');
-    console.error(`  Error message: ${error.message}`);
-    console.error(`  Error details:`, error.response?.data || error);
-    alert("Failed to post ride.");
-  } finally {
-    setIsPosting(false);
-    setShowConfirmDialog(false);
-    console.log('========================================');
-    console.log('🏁 [OFFER RIDE] Ride posting process ended');
-    console.log('========================================');
   }
-};
+
+  const confirmPostRide = async () => {
+    console.log('========================================');
+    console.log('🚗 [OFFER RIDE] Starting ride posting...');
+    console.log('========================================');
+
+    if (!startCoords || !endCoords) {
+      console.error('❌ [OFFER RIDE] Missing coordinates:', { startCoords, endCoords });
+      alert("Please select valid locations.");
+      return;
+    }
+
+    console.log('📍 [OFFER RIDE] Coordinates obtained:');
+    console.log(`  From: [${startCoords[0]}, ${startCoords[1]}] - ${formData.from}`);
+    console.log(`  To: [${endCoords[0]}, ${endCoords[1]}] - ${formData.to}`);
+
+    setIsPosting(true);
+
+    try {
+      // 1. Use already fetched route details
+      if (!routeDetails) {
+        console.error('❌ [OFFER RIDE] Missing route details');
+        alert("Route details missing. Please try again.");
+        return;
+      }
+
+      const routePolyline = routeDetails.coordinates;
+
+      console.log('✅ [OFFER RIDE] Route polyline obtained:');
+      console.log(`  Waypoints: ${routePolyline.length}`);
+      console.log(`  Distance: ${routeDetails.distance} km`);
+      console.log(`  Duration: ${routeDetails.duration} mins`);
+
+      // 2. Build GeoJSON
+      const routeGeoJSON = {
+        type: "LineString",
+        coordinates: routePolyline
+      };
+
+      // 3. Build ride data
+      const rideData = {
+        startLocation: {
+          name: formData.from,
+          lat: startCoords[1],
+          lng: startCoords[0]
+        },
+        endLocation: {
+          name: formData.to,
+          lat: endCoords[1],
+          lng: endCoords[0]
+        },
+        departureTime: formData.datetime,
+        availableSeats: formData.seats,
+        price: formData.price,
+        notes: formData.notes,
+        routePolyline,
+        routeGeoJSON
+      };
+
+      console.log('📤 [OFFER RIDE] Sending ride data to server:');
+      console.log(`  From: ${rideData.startLocation.name}`);
+      console.log(`  From Coords: [${rideData.startLocation.lng}, ${rideData.startLocation.lat}]`);
+      console.log(`  To: ${rideData.endLocation.name}`);
+      console.log(`  To Coords: [${rideData.endLocation.lng}, ${rideData.endLocation.lat}]`);
+      console.log(`  Date: ${rideData.departureTime}`);
+      console.log(`  Seats: ${rideData.availableSeats}`);
+      console.log(`  Price: ₹${rideData.price}`);
+      console.log(`  Route points: ${routePolyline.length}`);
+
+      // 4. Send full ride data to backend
+      const res = await api.post('/rides', rideData);
+
+      console.log('✅ [OFFER RIDE] Response received from server:');
+      console.log(`  Status: ${res.status}`);
+      console.log(`  Ride ID: ${res.data._id}`);
+
+      if (res.status === 201) {
+        console.log('🎉 [OFFER RIDE] Ride created successfully!');
+
+        // Instead of addRide, re-fetch all live rides to ensure consistency
+        console.log('🔄 [OFFER RIDE] Refreshing live rides list...');
+        const updatedLiveRides = await api.get('/rides');
+        console.log(`✅ [OFFER RIDE] Live rides refreshed. Total rides: ${updatedLiveRides.data.length}`);
+
+        setLiveRides(updatedLiveRides.data);
+
+        alert("Ride posted successfully!");
+
+        setFormData({
+          from: "",
+          to: "",
+          datetime: "",
+          seats: 1,
+          price: "",
+          notes: "",
+        });
+        console.log('📋 [OFFER RIDE] Form cleared and navigating to map...');
+        navigate('/dashboard?section=map'); // Navigate to Live Map section
+      } else {
+        console.error(`❌ [OFFER RIDE] Unexpected status code: ${res.status}`);
+        alert("Failed to post ride.");
+      }
+    } catch (error) {
+      console.error('❌ [OFFER RIDE] Error during ride posting:');
+      console.error(`  Error message: ${error.message}`);
+      console.error(`  Error details:`, error.response?.data || error);
+      alert("Failed to post ride.");
+    } finally {
+      setIsPosting(false);
+      setShowConfirmDialog(false);
+      console.log('========================================');
+      console.log('🏁 [OFFER RIDE] Ride posting process ended');
+      console.log('========================================');
+    }
+  };
 
 
   const handleViewRequest = (request) => {
@@ -295,7 +319,7 @@ const confirmPostRide = async () => {
       <ConfirmationDialog
         isOpen={showConfirmDialog}
         title="Confirm Post Ride"
-        message={`Are you sure you want to post this ride from ${formData.from} to ${formData.to}? Passengers will be able to see and book this ride.`}
+        message={`Are you sure you want to post this ride from ${formData.from} to ${formData.to}?\n\nDistance: ${routeDetails?.distance.toFixed(1)} km\nEstimated Price: ₹${formData.price}\n\nPassengers will be able to see and book this ride.`}
         confirmText="Post Ride"
         cancelText="Cancel"
         isDangerous={false}
@@ -303,7 +327,7 @@ const confirmPostRide = async () => {
         onConfirm={confirmPostRide}
         onCancel={() => setShowConfirmDialog(false)}
       />
-      
+
       <div className="mb-10">
         <h1 className="text-4xl font-bold text-white mb-2"> Offer a Ride</h1>
         <p className="text-gray-400">Share your ride and earn money</p>
@@ -351,13 +375,13 @@ const confirmPostRide = async () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="relative">
                 <label className="block text-white font-semibold mb-3">From Location</label>
-                <input 
+                <input
                   type="text"
                   name="from"
                   value={formData.from}
                   onChange={handleInputChange}
-                  placeholder="Enter pickup location" 
-                  className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition" 
+                  placeholder="Enter pickup location"
+                  className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition"
                 />
                 {fromSuggestions.length > 0 && (
                   <ul className="absolute z-20 mt-1 w-full bg-gray-800 border border-white/10 rounded-lg max-h-56 overflow-auto">
@@ -373,13 +397,13 @@ const confirmPostRide = async () => {
               </div>
               <div className="relative">
                 <label className="block text-white font-semibold mb-3">To Location</label>
-                <input 
+                <input
                   type="text"
                   name="to"
                   value={formData.to}
                   onChange={handleInputChange}
-                  placeholder="Enter destination" 
-                  className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition" 
+                  placeholder="Enter destination"
+                  className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition"
                 />
                 {toSuggestions.length > 0 && (
                   <ul className="absolute z-20 mt-1 w-full bg-gray-800 border border-white/10 rounded-lg max-h-56 overflow-auto">
@@ -400,55 +424,50 @@ const confirmPostRide = async () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-white font-semibold mb-3">Date & Time</label>
-                <input 
+                <input
                   type="datetime-local"
                   name="datetime"
                   value={formData.datetime}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white focus:outline-none focus:ring-2 focus:ring-green-500 transition" 
+                  className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white focus:outline-none focus:ring-2 focus:ring-green-500 transition"
                 />
               </div>
               <div>
                 <label className="block text-white font-semibold mb-3">Available Seats</label>
-                <input 
+                <input
                   type="number"
                   name="seats"
-                  min="1" 
+                  min="1"
                   max="7"
                   value={formData.seats}
                   onChange={handleInputChange}
-                  placeholder="1-7 seats" 
-                  className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition" 
+                  placeholder="1-7 seats"
+                  className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-white font-semibold mb-3">Price per Seat (₹)</label>
-              <input 
-                type="number"
-                name="price"
-                value={formData.price}
-                onChange={handleInputChange}
-                placeholder="Enter price" 
-                className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition" 
-              />
+              <label className="block text-white font-semibold mb-3">Estimated Price (₹)</label>
+              <div className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-gray-400">
+                {formData.from && formData.to ? "Calculated at checkout (₹15/km)" : "Select locations first"}
+              </div>
             </div>
 
             <div>
               <label className="block text-white font-semibold mb-3">Notes</label>
-              <textarea 
+              <textarea
                 name="notes"
                 value={formData.notes}
                 onChange={handleInputChange}
-                placeholder="Add notes (music, pet-friendly, etc.)" 
+                placeholder="Add notes (music, pet-friendly, etc.)"
                 rows="4"
-                className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition" 
+                className="w-full px-4 py-3 border border-white/20 rounded-lg bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition"
               />
             </div>
 
             <button type="submit" className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-4 rounded-lg font-bold text-lg transition-all hover:shadow-xl hover:shadow-green-500/50">
-               Post Your Ride
+              Post Your Ride
             </button>
           </form>
         </div>
@@ -457,7 +476,7 @@ const confirmPostRide = async () => {
         <div>
           <div className="bg-white/5 backdrop-blur-lg p-6 rounded-2xl border border-white/10 h-fit sticky top-8">
             <h3 className="text-lg font-bold text-white mb-4">Route Preview</h3>
-            
+
             <div className="rounded-lg overflow-hidden border border-white/10 mb-4" style={{ height: '400px' }}>
               <LeafletMapComponent
                 startLocation={startCoords || null}

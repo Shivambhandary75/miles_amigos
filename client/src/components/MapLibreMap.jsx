@@ -235,7 +235,7 @@ export default function MapLibreMap({
         el.style.backgroundSize = 'contain'
 
         const popup = new maplibregl.Popup({ offset: 25 }).setHTML(
-          `<div class="text-sm"><strong>${marker.title ?? ''}</strong><br/>${marker.description ?? ''}</div>`
+          `<div class="text-sm" style="color: black !important;"><strong>${marker.title ?? ''}</strong><br/>${marker.description ?? ''}</div>`
         )
 
         const instance = new maplibregl.Marker(el).setLngLat(lngLat).setPopup(popup).addTo(map.current)
@@ -284,11 +284,11 @@ export default function MapLibreMap({
             console.error(`[MapLibreMap] Invalid pickup coords for passenger ${idx + 1}:`, point.pickupCoords)
           } else {
             const pickupEl = document.createElement('div')
-           pickupEl.className = 'w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-lg'
+            pickupEl.className = 'w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-lg'
             pickupEl.setAttribute('data-marker-type', `pickup-${idx}`)
 
             const popup = new maplibregl.Popup({ offset: 20 }).setHTML(
-              `<div class="text-xs"><strong>🔵 Pickup</strong><br/>${point.passengerName ?? `Passenger ${idx + 1}`}</div>`
+              `<div class="text-xs" style="color: black !important;"><strong>🔵 Pickup</strong><br/>${point.passengerName ?? `Passenger ${idx + 1}`}</div>`
             )
 
             const marker = new maplibregl.Marker(pickupEl).setLngLat(pickupCoords).setPopup(popup).addTo(map.current)
@@ -300,11 +300,11 @@ export default function MapLibreMap({
             console.error(`[MapLibreMap] Invalid drop coords for passenger ${idx + 1}:`, point.dropCoords)
           } else {
             const dropEl = document.createElement('div')
-         dropEl.className = 'w-6 h-6 bg-yellow-500 rounded-full border-2 border-white shadow-lg'
+            dropEl.className = 'w-6 h-6 bg-yellow-500 rounded-full border-2 border-white shadow-lg'
             dropEl.setAttribute('data-marker-type', `drop-${idx}`)
 
             const popup = new maplibregl.Popup({ offset: 20 }).setHTML(
-              `<div class="text-xs"><strong>🏁 Drop-off</strong><br/>${point.passengerName ?? `Passenger ${idx + 1}`}</div>`
+              `<div class="text-xs" style="color: black !important;"><strong>🏁 Drop-off</strong><br/>${point.passengerName ?? `Passenger ${idx + 1}`}</div>`
             )
 
             const marker = new maplibregl.Marker(dropEl).setLngLat(dropCoords).setPopup(popup).addTo(map.current)
@@ -357,7 +357,7 @@ export default function MapLibreMap({
           const el = document.createElement('div')
           el.className = 'w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-lg animate-pulse'
           el.setAttribute('data-live-marker', 'driver')
-          const popup = new maplibregl.Popup({ offset: 20 }).setHTML('<div class="text-xs"><strong>Driver Location</strong></div>')
+          const popup = new maplibregl.Popup({ offset: 20 }).setHTML('<div class="text-xs" style="color: black !important;"><strong>Driver Location</strong></div>')
           liveMarkersRef.current.driver = new maplibregl.Marker(el).setLngLat(coords).setPopup(popup).addTo(map.current)
         }
       } else {
@@ -380,7 +380,7 @@ export default function MapLibreMap({
           const el = document.createElement('div')
           el.className = 'w-5 h-5 bg-green-500 rounded-full border-2 border-white shadow-lg'
           el.setAttribute('data-live-marker', `passenger-${idx}`)
-          const popup = new maplibregl.Popup({ offset: 20 }).setHTML('<div class="text-xs"><strong>Passenger Location</strong></div>')
+          const popup = new maplibregl.Popup({ offset: 20 }).setHTML('<div class="text-xs" style="color: black !important;"><strong>Passenger Location</strong></div>')
           const marker = new maplibregl.Marker(el).setLngLat(coords).setPopup(popup).addTo(map.current)
           liveMarkersRef.current.passengers.push(marker)
         })
