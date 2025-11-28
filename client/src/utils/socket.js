@@ -41,7 +41,7 @@ export function getSocket() {
 
 export function joinRide(rideId, userId, role) {
   const s = getSocket()
-  
+
   console.log('========================================')
   console.log('🚪 [SOCKET] Joining ride room:')
   console.log('========================================')
@@ -51,13 +51,13 @@ export function joinRide(rideId, userId, role) {
   console.log(`Room Name: ride-${rideId}`)
   console.log('Time:', new Date().toLocaleTimeString())
   console.log('========================================\n')
-  
+
   s.emit('join-ride', { rideId, userId, role })
 }
 
 export function updateLocation(rideId, userId, role, lat, lng) {
   const s = getSocket()
-  
+
   console.log('========================================')
   console.log('📤 [SOCKET] Emitting location-update:')
   console.log('========================================')
@@ -69,7 +69,7 @@ export function updateLocation(rideId, userId, role, lat, lng) {
   console.log(`Coordinates: [${lng}, ${lat}]`)
   console.log('Time:', new Date().toLocaleTimeString())
   console.log('========================================\n')
-  
+
   s.emit('location-update', { rideId, userId, role, lat, lng })
 }
 
@@ -87,6 +87,16 @@ export function onLocationsUpdate(callback) {
 export function removeLocationsUpdateListener(callback) {
   const s = getSocket()
   s.off('locations-update', callback)
+}
+
+export function onLocationMismatchNotification(callback) {
+  const s = getSocket()
+  s.on('location-mismatch-notification', callback)
+}
+
+export function removeLocationMismatchListener(callback) {
+  const s = getSocket()
+  s.off('location-mismatch-notification', callback)
 }
 
 export function closeSocket() {

@@ -114,6 +114,18 @@ const RideSchema = new mongoose.Schema({
             type: Number,
             required: true,
             default: 0
+        },
+        locationVerified: {
+            type: Boolean,
+            default: false
+        },
+        distanceFromDestination: {
+            type: Number, // in kilometers
+            default: null
+        },
+        completionConfirmed: {
+            type: Boolean,
+            default: false
         }
     }]
 
