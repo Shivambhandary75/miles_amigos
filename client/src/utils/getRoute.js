@@ -2,7 +2,12 @@ export async function getRoute(startCoords, endCoords) {
   const [startLng, startLat] = startCoords;
   const [endLng, endLat] = endCoords;
 
-  const url = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
+  const params = new URLSearchParams({
+    start: `${startLng},${startLat}`,
+    end: `${endLng},${endLat}`
+  });
+
+  const url = `/api/geocode/route?${params.toString()}`;
 
   const res = await fetch(url);
   const data = await res.json();
