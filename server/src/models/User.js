@@ -32,7 +32,13 @@ const UserSchema = new mongoose.Schema({
         max: 5,
         default: 0
     },
-    
+    PassengerRating: {
+        type: Number,
+        min: 0,
+        max: 5,
+        default: 0
+    },
+
     verifications: {
         email: { type: Boolean, default: false },
         phone: { type: Boolean, default: false },
@@ -61,6 +67,11 @@ const UserSchema = new mongoose.Schema({
         ref: "User"
     }],
 
+    blockedUsers: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
+    }],
+
     notifications: [new mongoose.Schema({
         icon: String,
         title: String,
@@ -75,7 +86,7 @@ const UserSchema = new mongoose.Schema({
 })
 
 // Hash password before save
-UserSchema.pre('save', async function(next) {
+UserSchema.pre('save', async function (next) {
     if (!this.isModified('password')) return next();
     try {
         const salt = await bcrypt.genSalt(10);
@@ -86,7 +97,7 @@ UserSchema.pre('save', async function(next) {
     }
 });
 
-UserSchema.methods.comparePassword = async function(candidatePassword) {
+UserSchema.methods.comparePassword = async function (candidatePassword) {
     return await bcrypt.compare(candidatePassword, this.password)
 }
 

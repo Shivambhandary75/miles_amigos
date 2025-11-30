@@ -32,10 +32,11 @@ export const TILE_SERVERS = {
  */
 export async function getRoute(start, end) {
   try {
-    const coords = `${start[0]},${start[1]};${end[0]},${end[1]}`;
-    const response = await fetch(
-      `${OSRM_API}/route/v1/driving/${coords}?overview=full&geometries=geojson`
-    );
+    const params = new URLSearchParams({
+      start: `${start[0]},${start[1]}`,
+      end: `${end[0]},${end[1]}`
+    });
+    const response = await fetch(`/api/geocode/route?${params.toString()}`);
 
     if (!response.ok) {
       throw new Error("Failed to fetch route");
@@ -200,9 +201,9 @@ export function haversineDistance(point1, point2) {
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
@@ -216,9 +217,8 @@ export function haversineDistance(point1, point2) {
  */
 export async function getNearbyPOI(latitude, longitude, radius = 1000) {
   try {
-    const bbox = `${longitude - radius / 111000},${
-      latitude - radius / 111000
-    },${longitude + radius / 111000},${latitude + radius / 111000}`;
+    const bbox = `${longitude - radius / 111000},${latitude - radius / 111000
+      },${longitude + radius / 111000},${latitude + radius / 111000}`;
     const response = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&amenity=*&viewbox=${bbox}&bounded=1`
     );

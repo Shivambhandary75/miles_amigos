@@ -1,4 +1,5 @@
 const Ride = require("../models/Ride");
+const User = require("../models/User");
 const turf = require("@turf/turf");
 
 // Check if a point is within maxDistance of closest route point
@@ -33,12 +34,13 @@ exports.searchRides = async (req, res) => {
         console.log('\n========================================');
         console.log('🔍 [SEARCH] Starting ride search...');
         console.log('========================================');
-        
-        const { pickup, drop } = req.body;
+
+        const { pickup, drop, date } = req.body;
 
         console.log('📍 [SEARCH] Request received:');
         console.log(`  Pickup: [${pickup?.lng}, ${pickup?.lat}]`);
         console.log(`  Drop: [${drop?.lng}, ${drop?.lat}]`);
+        console.log(`  Date: ${date || 'Not specified'}`);
 
         if (!pickup || !drop) {
             console.error('❌ [SEARCH] Missing pickup or drop coordinates');
@@ -50,29 +52,49 @@ exports.searchRides = async (req, res) => {
         const dropPoint = [drop.lng, drop.lat];
 
         console.log('🗄️  [SEARCH] Fetching rides from database...');
-        
-        // First, check ALL rides in the database
-        const allRidesInDB = await Ride.find({}).populate("driver", "name Rating email");
-        console.log(`📊 [SEARCH] Total rides in database: ${allRidesInDB.length}`);
-        allRidesInDB.forEach((ride, idx) => {
-            const hasPolyline = ride.routePolyline && ride.routePolyline.length > 0;
-            console.log(`  ${idx + 1}. Departure: ${new Date(ride.departureTime).toISOString()}, Available Seats: ${ride.availableSeats}, Has Route: ${hasPolyline}, Status: ${ride.status}`);
-        });
-        
-        // Fetch all future rides with seats (including the newly created ones)
+
+        // Build query for future rides
+        let dateFilter = { $gte: new Date() };
+
+        if (date) {
+            const searchDate = new Date(date);
+            const startOfDay = new Date(searchDate); startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(searchDate); endOfDay.setHours(23, 59, 59, 999);
+
+            // Ensure we don't show past rides even if date is today
+            const now = new Date();
+            let effectiveStart = startOfDay;
+            if (effectiveStart < now) {
+                effectiveStart = now;
+            }
+
+            dateFilter = { $gte: effectiveStart, $lte: endOfDay };
+        }
+
+        // Fetch blocked users logic
+        const currentUser = await User.findById(req.user.id);
+        // Users who have blocked the current user
+        const blockers = await User.find({ blockedUsers: req.user.id }).select('_id');
+
+        const blockedDriverIds = [
+            ...(currentUser.blockedUsers || []),
+            ...blockers.map(u => u._id)
+        ];
+
+        console.log(`🚫 [SEARCH] Excluding ${blockedDriverIds.length} blocked drivers`);
+
+        // Fetch rides matching criteria
         const rides = await Ride.find({
-            departureTime: { $gte: new Date() },
+            departureTime: dateFilter,
             availableSeats: { $gt: 0 },
-            status: { $ne: 'cancelled' }
+            status: { $ne: 'cancelled' },
+            driver: { $nin: blockedDriverIds }
         }).populate("driver", "name Rating email");
 
         console.log(`✅ [SEARCH] Found ${rides.length} available rides matching criteria`);
-        
+
         if (rides.length === 0) {
             console.log('⚠️  [SEARCH] No rides matching criteria');
-            console.log('   Rides with past dates:');
-            const pastRides = allRidesInDB.filter(r => r.departureTime < new Date());
-            console.log(`   Found ${pastRides.length} rides with past dates`);
         }
         console.log('\n📋 [SEARCH] Ride details:');
         rides.forEach((ride, idx) => {
@@ -161,7 +183,7 @@ exports.searchRides = async (req, res) => {
 
         console.log(`\n📊 [SEARCH] Search complete:`);
         console.log(`   Total matches: ${matches.length}`);
-        
+
         if (matches.length > 0) {
             console.log('\n📤 [SEARCH] Sending response with matched rides:');
             matches.forEach((match, idx) => {
@@ -172,7 +194,7 @@ exports.searchRides = async (req, res) => {
                 console.log(`     Seats: ${match.availableSeats}, Price: ₹${match.price}`);
             });
         }
-        
+
         console.log('========================================\n');
 
         res.json({ matches });

@@ -1,5 +1,5 @@
 const express = require('express');
-const   router = express.Router();
+const router = express.Router();
 const {
     createRide,
     findRides,
@@ -54,6 +54,9 @@ router.route('/:id/passenger-confirm-completion')
 
 router.route('/:id/rate')
     .post(protect, rateRide);
+
+router.route('/:id/rate-passenger/:passengerId')
+    .post(protect, require('../controllers/rideController').ratePassenger);
 
 router.route('/:rideId/requests/:passengerId/accept')
     .put(protect, acceptRideRequest);

@@ -3,7 +3,7 @@ import MapLibreMap from '../MapLibreMap'
 import api from '../../utils/api'
 import location from '../../assets/icons8-location-50.png'
 import { getRoute } from '../../utils/mapService'
-import { joinRide, updateLocation, leaveRide, onLocationsUpdate, removeLocationsUpdateListener, initSocket } from '../../utils/socket'
+import { joinRide, updateLocation, leaveRide, onLocationsUpdate, removeLocationsUpdateListener, onLocationMismatchNotification, removeLocationMismatchListener, initSocket } from '../../utils/socket'
 
 export default function LiveMap() {
   const [acceptedRides, setAcceptedRides] = useState([])
@@ -19,6 +19,7 @@ export default function LiveMap() {
   const [watchId, setWatchId] = useState(null)
   const [dualPaths, setDualPaths] = useState(null) // { driver: [...], passenger: [...] }
   const [passengerPoints, setPassengerPoints] = useState(null) // For driver to see passenger pickup/drop
+  const [locationMismatchNotification, setLocationMismatchNotification] = useState(null) // For location mismatch alerts
 
   // Helper: extract name or object safely
   const getName = (loc) => {
@@ -29,8 +30,9 @@ export default function LiveMap() {
 
   // Helper: extract [lng, lat]
   const getCoords = (loc) => {
-    if (!loc) return [77.6245, 12.9352]
-    return [loc.lng ?? 77.6245, loc.lat ?? 12.9352]
+    if (!loc) return null
+    if (typeof loc.lng !== 'number' || typeof loc.lat !== 'number') return null
+    return [loc.lng, loc.lat]
   }
 
   // Initialize Socket.IO and get user ID
@@ -83,6 +85,30 @@ export default function LiveMap() {
       removeLocationsUpdateListener(handleLocationsUpdate)
     }
   }, [])
+
+  // Listen for location mismatch notifications
+  useEffect(() => {
+    const handleLocationMismatch = (data) => {
+      console.log('========================================')
+      console.log('⚠️  [SOCKET] Location mismatch notification received:')
+      console.log('========================================')
+      console.log('Data:', data)
+      console.log('Passenger ID:', data.passengerId)
+      console.log('User ID:', userId)
+      console.log('========================================\n')
+
+      // Only show notification if it's for this user
+      if (data.passengerId === userId) {
+        setLocationMismatchNotification(data)
+      }
+    }
+
+    onLocationMismatchNotification(handleLocationMismatch)
+
+    return () => {
+      removeLocationMismatchListener(handleLocationMismatch)
+    }
+  }, [userId])
 
   // Start tracking user's geolocation
   useEffect(() => {
@@ -141,8 +167,11 @@ export default function LiveMap() {
   }, [currentRide, userId, userRole])
 
   useEffect(() => {
-    fetchAcceptedRides()
-  }, [])
+    if (userId) {
+      console.log('👤 [LiveMap] User ID set, fetching rides...')
+      fetchAcceptedRides()
+    }
+  }, [userId])
 
   // Log whenever passengerPoints changes
   useEffect(() => {
@@ -177,7 +206,12 @@ export default function LiveMap() {
       setPassengerRides(passengerRidesData)
 
       // Decide current ride
+      console.log('🎭 [ROLE] Determining user role...')
+      console.log('  Driver rides:', driverRides.length)
+      console.log('  Passenger rides:', passengerRidesData.length)
+
       if (driverRides.length > 0) {
+        console.log('  ✅ User is DRIVER')
         setUserRole("driver")
 
         const ride = driverRides[0] // top-most active ride
@@ -237,8 +271,18 @@ export default function LiveMap() {
 
         const ride = passengerRidesData[0]
 
+        console.log('🚶 [PASSENGER] Processing passenger ride:')
+        console.log('  User ID:', userId)
+        console.log('  Ride passengers:', ride.passengers)
+
         // For passenger, get their actual pickup/drop location from the passengers array
-        const passengerEntry = ride.passengers?.find(p => p.user === userId || p.user?._id === userId)
+        const passengerEntry = ride.passengers?.find(p => {
+          const pUserId = p.user?._id || p.user
+          console.log('  Checking passenger:', pUserId, 'vs', userId)
+          return pUserId === userId || p.user === userId
+        })
+
+        console.log('  Found passenger entry:', passengerEntry)
 
         const newCurrentRide = {
           id: ride.id,
@@ -264,6 +308,7 @@ export default function LiveMap() {
         }
 
         // Fetch dual paths for this ride
+        console.log('  Calling fetchDualPaths with passengerEntry:', passengerEntry)
         await fetchDualPaths(ride, passengerEntry)
 
       } else {
@@ -285,23 +330,37 @@ export default function LiveMap() {
 
   const fetchDualPaths = async (ride, passengerEntry = null) => {
     try {
+      console.log('🛣️ [DUAL PATHS] Fetching dual paths...')
+      console.log('  Passenger Entry:', passengerEntry)
+
       // Get driver's path (start to end of ride)
       const driverStart = getCoords(ride.from)
       const driverEnd = getCoords(ride.to)
+      console.log('  Driver route:', driverStart, '->', driverEnd)
       const driverRoute = await getRoute(driverStart, driverEnd)
+      console.log('  Driver route coordinates:', driverRoute?.coordinates?.length || 0, 'points')
 
       // Get passenger's path if available
       let passengerRoute = null
       if (passengerEntry) {
         const passengerStart = getCoords(passengerEntry.startLocation)
         const passengerEnd = getCoords(passengerEntry.endLocation)
+        console.log('  Passenger route:', passengerStart, '->', passengerEnd)
         passengerRoute = await getRoute(passengerStart, passengerEnd)
+        console.log('  Passenger route coordinates:', passengerRoute?.coordinates?.length || 0, 'points')
+      } else {
+        console.log('  ⚠️ No passenger entry - passenger route will not be displayed')
       }
 
-      setDualPaths({
+      const paths = {
         driver: driverRoute?.coordinates || [],
         passenger: passengerRoute?.coordinates || []
+      }
+      console.log('  Setting dual paths:', {
+        driverPoints: paths.driver.length,
+        passengerPoints: paths.passenger.length
       })
+      setDualPaths(paths)
     } catch (err) {
       console.error('Error fetching dual paths:', err)
     }
@@ -316,6 +375,48 @@ export default function LiveMap() {
 
   const handleTileServerChange = (server) => setSelectedTileServer(server)
 
+  const [waitingForPassengerConfirmation, setWaitingForPassengerConfirmation] = useState(false)
+
+  // Listen for ride completion event (when passenger confirms)
+  useEffect(() => {
+    const socket = initSocket()
+    if (socket) {
+      socket.on('ride-completed', (data) => {
+        console.log('🎉 [SOCKET] Ride completed event received:', data)
+        if (currentRide && data.rideId === currentRide.id) {
+          setWaitingForPassengerConfirmation(false)
+          alert("✅ Passenger confirmed! Ride completed.")
+
+          // Clear ride data
+          removeLocationsUpdateListener(() => { })
+          leaveRide()
+          setCurrentRide(null)
+          setAcceptedRides([])
+          setPassengerRides([])
+          setLiveLocations(null)
+          setDualPaths(null)
+          setPassengerPoints(null)
+          setRouteInfo(null)
+          setUserRole(null)
+
+          if (watchId) {
+            navigator.geolocation.clearWatch(watchId)
+            setWatchId(null)
+          }
+
+          setTimeout(() => {
+            fetchAcceptedRides()
+          }, 1000)
+        }
+      })
+    }
+    return () => {
+      if (socket) {
+        socket.off('ride-completed')
+      }
+    }
+  }, [currentRide, watchId])
+
   const handlePaymentConfirm = async () => {
     if (!currentRide) return
 
@@ -326,9 +427,17 @@ export default function LiveMap() {
 
       const { latitude: lat, longitude: lng } = position.coords
 
-      await api.post(`/rides/${currentRide.id}/confirm-payment`, {
+      const res = await api.post(`/rides/${currentRide.id}/confirm-payment`, {
         driverLocation: { lat, lng }
       })
+
+      console.log('Payment confirmation response:', res.data)
+
+      if (res.data.status === 'pending-passenger-confirmation') {
+        console.log('⏳ Waiting for passenger confirmation...')
+        setWaitingForPassengerConfirmation(true)
+        return
+      }
 
       console.log('✅ Payment confirmed - Clearing ride from live map')
 
@@ -390,7 +499,7 @@ export default function LiveMap() {
   }
 
   // Build markers for map
-  const driverMarkers = currentRide ? [
+  const driverMarkers = currentRide && currentRide.startCoords ? [
     {
       title: "Start",
       description: userRole === "driver"
@@ -567,8 +676,8 @@ export default function LiveMap() {
                   key={server}
                   onClick={() => handleTileServerChange(server)}
                   className={`px-3 py-1 rounded text-xs ${selectedTileServer === server
-                      ? "bg-blue-600 text-white"
-                      : "bg-white/20 text-gray-200"
+                    ? "bg-blue-600 text-white"
+                    : "bg-white/20 text-gray-200"
                     }`}
                 >
                   {server}
@@ -704,6 +813,91 @@ export default function LiveMap() {
         </div>
 
       </div>
+
+      {/* Location Mismatch Notification Modal */}
+      {locationMismatchNotification && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-gray-900 to-gray-800 p-6 rounded-2xl max-w-md w-full border border-yellow-500/30 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-yellow-500/20 rounded-full flex items-center justify-center">
+                <span className="text-3xl">⚠️</span>
+              </div>
+              <h3 className="text-xl font-bold text-yellow-400">
+                {locationMismatchNotification.title}
+              </h3>
+            </div>
+
+            <div className="bg-black/30 p-4 rounded-lg mb-4">
+              <p className="text-gray-200 text-sm leading-relaxed mb-3">
+                {locationMismatchNotification.message}
+              </p>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="bg-yellow-500/10 p-2 rounded">
+                  <p className="text-yellow-400 font-semibold">Distance</p>
+                  <p className="text-white">{locationMismatchNotification.distance} km</p>
+                </div>
+                <div className="bg-blue-500/10 p-2 rounded">
+                  <p className="text-blue-400 font-semibold">Destination</p>
+                  <p className="text-white text-xs truncate">{locationMismatchNotification.destination}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-yellow-500/10 border border-yellow-500/30 p-3 rounded-lg mb-4">
+              <p className="text-yellow-300 text-xs">
+                <strong>Action Required:</strong> The driver wants to complete the ride, but you are not at the destination. Please confirm if you want to end the ride.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setLocationMismatchNotification(null)}
+                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 rounded-lg font-semibold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await api.post(`/rides/${locationMismatchNotification.rideId}/passenger-confirm-completion`)
+                    setLocationMismatchNotification(null)
+                    alert("✅ Ride completion confirmed!")
+                    // Refresh to update UI
+                    setTimeout(fetchAcceptedRides, 500)
+                  } catch (err) {
+                    console.error('Error confirming completion:', err)
+                    alert("Failed to confirm completion")
+                  }
+                }}
+                className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white py-3 rounded-lg font-semibold transition-colors"
+              >
+                Accept & End Ride
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Waiting for Passenger Confirmation Modal */}
+      {waitingForPassengerConfirmation && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-gray-900 to-gray-800 p-6 rounded-2xl max-w-md w-full border border-blue-500/30 shadow-2xl text-center">
+            <div className="w-16 h-16 mx-auto bg-blue-500/20 rounded-full flex items-center justify-center mb-4 animate-pulse">
+              <span className="text-3xl">⏳</span>
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">
+              Waiting for Passenger Confirmation
+            </h3>
+            <p className="text-gray-400 text-sm mb-6">
+              The passenger is not near the destination. A request has been sent to them to confirm the ride completion.
+            </p>
+            <div className="bg-blue-500/10 p-3 rounded-lg border border-blue-500/20">
+              <p className="text-blue-300 text-xs animate-pulse">
+                Please wait for the passenger to accept...
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   )
 }

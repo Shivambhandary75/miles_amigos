@@ -1,6 +1,7 @@
 const Ride = require('../models/Ride');
 const User = require('../models/User');
-const { haversineDistance } = require('../utils/mapRouting');
+const { haversineDistance, getRoute } = require('../utils/mapRouting');
+const jwt = require('jsonwebtoken');
 
 // @desc    Create a new ride
 // @route   POST /api/rides
@@ -12,7 +13,6 @@ const createRide = async (req, res) => {
             endLocation,
             departureTime,
             availableSeats,
-            price,
             notes,
             routePolyline,
             routeGeoJSON
@@ -28,7 +28,15 @@ const createRide = async (req, res) => {
         console.log(`End Location: ${endLocation?.name} [${endLocation?.lng}, ${endLocation?.lat}]`);
         console.log(`Departure Time: ${departureTime}`);
         console.log(`Available Seats: ${availableSeats}`);
-        console.log(`Price: ₹${price}`);
+
+        // Calculate price server-side
+        let price = 15; // Base rate per km, actual price calculated per passenger
+        let distance = 0;
+
+        // We no longer calculate the full route price here as per user request.
+        // The price will be calculated for each passenger based on their distance.
+        console.log('ℹ️ [CREATE RIDE] Price set to base rate (15). Actual fare calculated per passenger.');
+
         console.log(`Notes: ${notes || 'None'}`);
         console.log(`Route Polyline Points: ${routePolyline?.length || 0}`);
 
@@ -107,13 +115,34 @@ const findRides = async (req, res) => {
         if (end) {
             query.endLocation = { $regex: end, $options: 'i' };
         }
-        
+
         // Include rides that are scheduled for the future or are currently in-progress
         query.$or = [
             { departureTime: { $gt: new Date() }, status: 'scheduled' },
             { status: 'in-progress' }
         ];
         query.availableSeats = { $gt: 0 }; // Only rides with available seats
+
+        // Optional: Filter blocked users if token is present
+        if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+            try {
+                const token = req.headers.authorization.split(' ')[1];
+                const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                const userId = decoded.id;
+
+                const currentUser = await User.findById(userId);
+                if (currentUser) {
+                    const blockers = await User.find({ blockedUsers: userId }).select('_id');
+                    const blockedDriverIds = [
+                        ...(currentUser.blockedUsers || []),
+                        ...blockers.map(u => u._id)
+                    ];
+                    query.driver = { $nin: blockedDriverIds };
+                }
+            } catch (err) {
+                console.warn('[findRides] Invalid token, skipping blocked user filter');
+            }
+        }
 
         const rides = await Ride.find(query).populate('driver', 'name Rating');
         res.json(rides);
@@ -146,12 +175,12 @@ const getRideById = async (req, res) => {
 const joinRide = async (req, res) => {
     try {
         const rideId = req.params.id;
-        
+
         // Validate ride ID
         if (!rideId) {
             return res.status(400).json({ message: 'Ride ID is required' });
         }
-        
+
         const ride = await Ride.findById(rideId);
         const passengerId = req.user.id;
         const { startLocation, endLocation } = req.body;
@@ -174,7 +203,7 @@ const joinRide = async (req, res) => {
             return res.status(404).json({ message: 'Ride not found' });
         }
 
-        console.log('Ride found, checking conditions:', { 
+        console.log('Ride found, checking conditions:', {
             driverId: ride.driver.toString(),
             passengerId,
             availableSeats: ride.availableSeats,
@@ -203,7 +232,21 @@ const joinRide = async (req, res) => {
             if (ride.availableSeats > 0) {
                 console.log('Seats available, proceeding with booking');
                 try {
-                    ride.passengers.push({ user: passengerId, startLocation, endLocation, status: 'pending' }); // Set status to pending
+                    // Calculate price for this passenger
+                    const dist = haversineDistance(
+                        [startLocation.lat, startLocation.lng],
+                        [endLocation.lat, endLocation.lng]
+                    );
+                    const passengerPrice = Math.ceil(dist * 15);
+                    console.log(`💰 [JOIN RIDE] Calculated price for passenger: ₹${passengerPrice} (${dist.toFixed(2)} km @ ₹15/km)`);
+
+                    ride.passengers.push({
+                        user: passengerId,
+                        startLocation,
+                        endLocation,
+                        status: 'pending',
+                        price: passengerPrice
+                    }); // Set status to pending
                     // Do NOT decrement availableSeats here. Decrement only upon acceptance.
                     console.log('About to save ride with passengers:', { passengers: ride.passengers, availableSeats: ride.availableSeats });
                     const updatedRide = await ride.save();
@@ -221,7 +264,7 @@ const joinRide = async (req, res) => {
                         // Safely get location names
                         const startLocationName = ride.startLocation?.name || startLocation?.name || 'Unknown location';
                         const endLocationName = ride.endLocation?.name || endLocation?.name || 'Unknown location';
-                        
+
                         // Notification details
                         driverUser.notifications = driverUser.notifications || [];
                         driverUser.notifications.push({
@@ -264,16 +307,16 @@ const getUserRides = async (req, res) => {
     try {
         const userId = req.user.id;
         console.log(`[getUserRides] Fetching rides for user: ${userId}`)
-        
+
         const user = await User.findById(userId)
             .populate({ path: 'GivenRides', populate: { path: 'driver', select: 'name Rating' }, select: 'status startLocation endLocation departureTime availableSeats price passengers' })
             .populate({ path: 'TakenRides', populate: { path: 'driver', select: 'name Rating' }, select: 'status startLocation endLocation departureTime availableSeats price passengers' });
-        
+
         console.log(`[getUserRides] User found: ${user ? 'Yes' : 'No'}`)
         if (user) {
             console.log(`[getUserRides] GivenRides count: ${user.GivenRides.length}`)
             console.log(`[getUserRides] TakenRides count: ${user.TakenRides.length}`)
-            
+
             // Log detailed ride info
             user.GivenRides.forEach((ride, idx) => {
                 console.log(`[getUserRides] Given Ride ${idx}: id=${ride._id}, status=${ride.status}, passengers=${ride.passengers.length}`)
@@ -281,14 +324,14 @@ const getUserRides = async (req, res) => {
                     console.log(`  - Passenger: ${p.user}, status: ${p.status}`)
                 })
             })
-            
+
             user.TakenRides.forEach((ride, idx) => {
                 console.log(`[getUserRides] Taken Ride ${idx}: id=${ride._id}, status=${ride.status}, passengers=${ride.passengers.length}`)
                 ride.passengers.forEach(p => {
                     console.log(`  - Passenger: ${p.user}, status: ${p.status}`)
                 })
             })
-            
+
             // Format rides for frontend
             const formatRide = (ride, role) => ({
                 id: ride._id,
@@ -304,31 +347,31 @@ const getUserRides = async (req, res) => {
                 role,
                 passengers: ride.passengers // Include passengers for detailed view
             });
-            
+
             // Only include scheduled and in-progress rides (exclude completed) AND must have at least one accepted passenger
             const givenRides = user.GivenRides
-              .filter(r => {
-                const hasAcceptedPassenger = r.passengers && r.passengers.some(p => p.status === 'accepted')
-                const isActive = r.status === 'scheduled' || r.status === 'in-progress'
-                return isActive && hasAcceptedPassenger
-              })
-              .map(r => formatRide(r, 'driver'));
-            
+                .filter(r => {
+                    const hasAcceptedPassenger = r.passengers && r.passengers.some(p => p.status === 'accepted')
+                    const isActive = r.status === 'scheduled' || r.status === 'in-progress'
+                    return isActive && hasAcceptedPassenger
+                })
+                .map(r => formatRide(r, 'driver'));
+
             const takenRides = user.TakenRides
-              .filter(r => {
-                const hasAcceptedPassenger = r.passengers && r.passengers.some(p => p.status === 'accepted')
-                const isActive = r.status === 'scheduled' || r.status === 'in-progress'
-                return isActive && hasAcceptedPassenger
-              })
-              .map(r => formatRide(r, 'passenger'));
-            
+                .filter(r => {
+                    const hasAcceptedPassenger = r.passengers && r.passengers.some(p => p.status === 'accepted')
+                    const isActive = r.status === 'scheduled' || r.status === 'in-progress'
+                    return isActive && hasAcceptedPassenger
+                })
+                .map(r => formatRide(r, 'passenger'));
+
             console.log(`[getUserRides] Given rides (active): ${givenRides.length}`)
             console.log(`[getUserRides] Taken rides (active): ${takenRides.length}`)
-            
+
             const response = {
                 rides: [...givenRides, ...takenRides]
             }
-            
+
             console.log(`[getUserRides] Sending ${response.rides.length} rides`)
             res.json(response);
         } else {
@@ -336,7 +379,7 @@ const getUserRides = async (req, res) => {
             res.status(404).json({ message: 'User not found' });
         }
     }
- catch (error) {
+    catch (error) {
         console.error(`[getUserRides] Error: ${error.message}`)
         res.status(500).json({ message: error.message });
     }
@@ -373,20 +416,35 @@ const getRideHistory = async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        const formatRide = (ride, role) => ({
-            id: ride._id,
-            from: ride.startLocation,
-            to: ride.endLocation,
-            date: ride.departureTime ? new Date(ride.departureTime).toLocaleDateString() : 'N/A',
-            time: ride.departureTime ? new Date(ride.departureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A',
-            driver: ride.driver ? { id: ride.driver._id, name: ride.driver.name, rating: ride.driver.Rating || 0 } : { id: null, name: 'Unknown', rating: 0 },
-            rating: ride.driver?.Rating || 0,
-            seats: ride.availableSeats,
-            fare: ride.price ? `₹${ride.price}` : 'N/A',
-            status: ride.status,
-            role,
-            passengers: ride.passengers
-        });
+        const formatRide = (ride, role) => {
+            let fare = ride.price ? `₹${ride.price}` : 'N/A';
+            let from = ride.startLocation;
+            let to = ride.endLocation;
+
+            if (role === 'passenger') {
+                const passengerEntry = ride.passengers.find(p => p.user._id.toString() === userId.toString());
+                if (passengerEntry) {
+                    fare = passengerEntry.price ? `₹${passengerEntry.price}` : fare;
+                    from = passengerEntry.startLocation || from;
+                    to = passengerEntry.endLocation || to;
+                }
+            }
+
+            return {
+                id: ride._id,
+                from: from,
+                to: to,
+                date: ride.departureTime ? new Date(ride.departureTime).toLocaleDateString() : 'N/A',
+                time: ride.departureTime ? new Date(ride.departureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A',
+                driver: ride.driver ? { id: ride.driver._id, name: ride.driver.name, rating: ride.driver.Rating || 0 } : { id: null, name: 'Unknown', rating: 0 },
+                rating: ride.driver?.Rating || 0,
+                seats: ride.availableSeats,
+                fare: fare,
+                status: ride.status,
+                role,
+                passengers: ride.passengers
+            };
+        };
 
 
         // For drivers, show active (scheduled/in-progress) rides with accepted passengers, and completed/cancelled rides
@@ -423,11 +481,21 @@ const getRideHistory = async (req, res) => {
 // @desc    Confirm payment and end ride
 // @route   POST /api/rides/:id/confirm-payment
 // @access  Private
+// @desc    Confirm payment and end ride
+// @route   POST /api/rides/:id/confirm-payment
+// @access  Private
 const confirmPaymentAndEndRide = async (req, res) => {
     try {
         const rideId = req.params.id;
         const driverId = req.user.id;
         const { driverLocation } = req.body; // { lat, lng }
+
+        console.log(`\n========================================`);
+        console.log(`💰 [CONFIRM PAYMENT] Starting payment confirmation`);
+        console.log(`========================================`);
+        console.log(`Ride ID: ${rideId}`);
+        console.log(`Driver ID: ${driverId}`);
+        console.log(`Driver Location: [${driverLocation?.lng}, ${driverLocation?.lat}]`);
 
         const ride = await Ride.findById(rideId).populate('passengers.user');
 
@@ -440,37 +508,135 @@ const confirmPaymentAndEndRide = async (req, res) => {
             return res.status(403).json({ message: 'You are not authorized to perform this action' });
         }
 
-        // For simplicity, we'll use the end location of the first accepted passenger.
         const acceptedPassengers = ride.passengers.filter(p => p.status === 'accepted');
-        
-        // Mark ride as completed
-        ride.status = 'completed';
-        await ride.save();
+        console.log(`Accepted passengers: ${acceptedPassengers.length}`);
 
         if (acceptedPassengers.length === 0) {
-            console.log(`[confirmPaymentAndEndRide] No accepted passengers, ride marked completed`)
+            // No passengers, complete ride immediately
+            ride.status = 'completed';
+            await ride.save();
+            console.log(`[confirmPaymentAndEndRide] No accepted passengers, ride marked completed`);
             return res.json({ message: 'Ride completed successfully' });
         }
 
-        const passengerDestination = acceptedPassengers[0].endLocation;
-        const distance = haversineDistance(
-            [driverLocation.lat, driverLocation.lng],
-            [passengerDestination.lat, passengerDestination.lng]
-        );
+        // Get Socket.IO instance and live locations
+        const io = req.app.get('io');
+        const DISTANCE_THRESHOLD_KM = 0.5; // 500 meters
 
-        console.log(`[confirmPaymentAndEndRide] Distance to destination: ${distance.toFixed(2)} km`)
+        console.log(`\n📍 [LOCATION VERIFICATION] Checking passenger locations...`);
+        console.log(`Distance threshold: ${DISTANCE_THRESHOLD_KM} km`);
 
-        // Notify passenger
-        const passenger = acceptedPassengers[0].user;
-        passenger.notifications.push({
-            title: 'Ride Completed',
-            desc: `Your ride from ${ride.startLocation.name} to ${ride.endLocation.name} is complete. Distance: ${distance.toFixed(2)} km`,
-            type: 'ride-confirmation',
-            rideId: rideId
-        });
-        await passenger.save();
+        let hasLocationMismatch = false;
+        const passengersNeedingConfirmation = [];
 
-        res.json({ message: 'Ride completed successfully', distance: distance.toFixed(2) });
+        // Verify each passenger's location
+        for (const passengerEntry of acceptedPassengers) {
+            const passengerDestination = passengerEntry.endLocation;
+            const passengerId = passengerEntry.user._id.toString();
+
+            console.log(`\n  Checking passenger: ${passengerEntry.user.name}`);
+            console.log(`  Destination: ${passengerDestination.name} [${passengerDestination.lat}, ${passengerDestination.lng}]`);
+
+            // Calculate distance from driver to passenger's destination
+            const driverToDestDistance = haversineDistance(
+                [driverLocation.lat, driverLocation.lng],
+                [passengerDestination.lat, passengerDestination.lng]
+            );
+            console.log(`  Driver to destination: ${driverToDestDistance.toFixed(3)} km`);
+
+            // Store verification result
+            passengerEntry.locationVerified = driverToDestDistance <= DISTANCE_THRESHOLD_KM;
+            passengerEntry.distanceFromDestination = driverToDestDistance;
+
+            // Check if passenger is NOT near their destination
+            if (driverToDestDistance > DISTANCE_THRESHOLD_KM) {
+                console.log(`  ⚠️  LOCATION MISMATCH DETECTED!`);
+                console.log(`  Distance exceeds threshold (${DISTANCE_THRESHOLD_KM} km)`);
+
+                hasLocationMismatch = true;
+                passengersNeedingConfirmation.push(passengerEntry.user.name);
+
+                // Mark as pending confirmation
+                passengerEntry.completionConfirmed = false;
+
+                // Send socket notification to passenger
+                if (io) {
+                    const roomName = `ride-${rideId}`;
+                    const notification = {
+                        type: 'location-mismatch',
+                        title: 'Ride Completion Requires Your Confirmation',
+                        message: `The driver has requested to end the ride, but you are ${driverToDestDistance.toFixed(2)} km from your destination (${passengerDestination.name}). Please confirm if you want to end the ride.`,
+                        rideId: rideId,
+                        distance: driverToDestDistance.toFixed(2),
+                        destination: passengerDestination.name,
+                        timestamp: new Date()
+                    };
+
+                    io.to(roomName).emit('location-mismatch-notification', {
+                        passengerId,
+                        ...notification
+                    });
+
+                    console.log(`  📤 Sent location mismatch notification to passenger`);
+                }
+
+                // Also add to user's notifications
+                passengerEntry.user.notifications.push({
+                    title: 'Ride Completion Pending',
+                    desc: `The driver has requested to end the ride, but you are ${driverToDestDistance.toFixed(2)} km from your destination. Please confirm to complete the ride.`,
+                    type: 'location-warning',
+                    rideId: rideId,
+                    createdAt: new Date()
+                });
+                await passengerEntry.user.save();
+            } else {
+                console.log(`  ✅ Passenger is near destination`);
+
+                // Auto-confirm since they're at destination
+                passengerEntry.completionConfirmed = true;
+
+                // Send normal completion notification
+                passengerEntry.user.notifications.push({
+                    title: 'Ride Completed',
+                    desc: `Your ride from ${ride.startLocation.name} to ${ride.endLocation.name} is complete.`,
+                    type: 'ride-confirmation',
+                    rideId: rideId,
+                    createdAt: new Date()
+                });
+                await passengerEntry.user.save();
+            }
+        }
+
+        // Save ride with verification data
+        await ride.save();
+
+        if (hasLocationMismatch) {
+            // Don't complete ride yet - waiting for passenger confirmation
+            console.log(`\n⏳ [CONFIRM PAYMENT] Waiting for passenger confirmation`);
+            console.log(`Passengers needing confirmation: ${passengersNeedingConfirmation.join(', ')}`);
+            console.log(`========================================\n`);
+
+            res.json({
+                message: 'Payment confirmation sent. Waiting for passenger acceptance.',
+                status: 'pending-passenger-confirmation',
+                passengersNeedingConfirmation: passengersNeedingConfirmation.length,
+                totalPassengers: acceptedPassengers.length
+            });
+        } else {
+            // All passengers are near destination, complete ride
+            ride.status = 'completed';
+            await ride.save();
+
+            console.log(`\n✅ [CONFIRM PAYMENT] All passengers verified, ride completed`);
+            console.log(`========================================\n`);
+
+            res.json({
+                message: 'Ride completed successfully',
+                status: 'completed',
+                passengersVerified: acceptedPassengers.length,
+                totalPassengers: acceptedPassengers.length
+            });
+        }
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: error.message });
@@ -485,6 +651,12 @@ const passengerConfirmRideCompletion = async (req, res) => {
         const rideId = req.params.id;
         const passengerId = req.user.id;
 
+        console.log(`\n========================================`);
+        console.log(`👍 [PASSENGER CONFIRM] Passenger confirming ride completion`);
+        console.log(`========================================`);
+        console.log(`Ride ID: ${rideId}`);
+        console.log(`Passenger ID: ${passengerId}`);
+
         const ride = await Ride.findById(rideId);
 
         if (!ride) {
@@ -497,29 +669,57 @@ const passengerConfirmRideCompletion = async (req, res) => {
             return res.status(403).json({ message: 'You are not a passenger on this ride' });
         }
 
-        ride.status = 'completed';
+        // Mark this passenger as confirmed
+        passengerEntry.completionConfirmed = true;
         await ride.save();
+        console.log(`✅ Passenger ${passengerId} confirmed completion`);
 
-        // Remove the 'ride-confirmation' notification from the passenger
+        // Check if all accepted passengers have confirmed
+        const acceptedPassengers = ride.passengers.filter(p => p.status === 'accepted');
+        const allConfirmed = acceptedPassengers.every(p => p.completionConfirmed);
+
+        if (allConfirmed) {
+            ride.status = 'completed';
+            await ride.save();
+            console.log(`🎉 All passengers confirmed! Ride marked as completed.`);
+
+            // Notify driver
+            const io = req.app.get('io');
+            if (io) {
+                io.to(`ride-${rideId}`).emit('ride-completed', { rideId });
+            }
+        } else {
+            console.log(`⏳ Waiting for other passengers to confirm...`);
+        }
+
+        // Remove the 'location-warning' notification from the passenger
         const passengerUser = await User.findById(passengerId);
         if (passengerUser) {
             passengerUser.notifications = passengerUser.notifications.filter(
-                notif => !(notif.type === 'ride-confirmation' && notif.rideId && notif.rideId.toString() === rideId)
+                notif => !(notif.type === 'location-warning' && notif.rideId && notif.rideId.toString() === rideId)
             );
             passengerUser.notifications.push({
                 title: 'Ride Confirmed',
                 desc: `You have confirmed the completion of your ride from ${ride.startLocation.name} to ${ride.endLocation.name}.`,
-                type: 'ride-update'
+                type: 'ride-update',
+                rideId: rideId,
+                createdAt: new Date()
             });
             await passengerUser.save();
         }
 
-        res.json({ message: 'Ride completion confirmed by passenger.' });
+        console.log(`========================================\n`);
+        res.json({
+            message: 'Ride completion confirmed by passenger.',
+            rideStatus: ride.status
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: error.message });
     }
 };
+
+
 
 // @desc    Get driver's current in-progress ride
 // @route   GET /api/rides/in-progress
@@ -532,8 +732,8 @@ const getDriverInProgressRide = async (req, res) => {
             driver: driverId,
             status: 'in-progress'
         })
-        .populate('driver', 'name Rating')
-        .populate('passengers.user', 'name status'); // Populate passenger user details and status
+            .populate('driver', 'name Rating')
+            .populate('passengers.user', 'name status'); // Populate passenger user details and status
 
         if (!ride) {
             return res.status(200).json({ message: 'No in-progress ride found for this driver.' });
@@ -558,7 +758,7 @@ const getDriverRideRequests = async (req, res) => {
             driver: driverId,
             'passengers.status': 'pending'
         })
-        .populate('passengers.user', 'name Rating'); // Populate passenger user details
+            .populate('passengers.user', 'name Rating'); // Populate passenger user details
 
         console.log(`[getDriverRideRequests] Found ${ridesWithPendingRequests.length} rides with pending requests`)
 
@@ -773,10 +973,10 @@ const startRide = async (req, res) => {
             }
         }
 
-        res.status(200).json({ 
-            message: 'Ride started successfully', 
+        res.status(200).json({
+            message: 'Ride started successfully',
             ride,
-            acceptedPassengers: acceptedPassengers.length 
+            acceptedPassengers: acceptedPassengers.length
         });
     } catch (error) {
         console.error(`[startRide] Error: ${error.message}`);
@@ -845,6 +1045,85 @@ const rateRide = async (req, res) => {
     }
 };
 
+// @desc    Driver rates a passenger
+// @route   POST /api/rides/:id/rate-passenger/:passengerId
+// @access  Private (Driver)
+const ratePassenger = async (req, res) => {
+    try {
+        const { id: rideId, passengerId } = req.params;
+        const driverId = req.user.id;
+        const { rating } = req.body;
+
+        // Validate rating
+        if (!rating || rating < 1 || rating > 5) {
+            return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+        }
+
+        const ride = await Ride.findById(rideId);
+
+        if (!ride) {
+            return res.status(404).json({ message: 'Ride not found' });
+        }
+
+        // Check if user is the driver
+        if (ride.driver.toString() !== driverId) {
+            return res.status(403).json({ message: 'You are not the driver of this ride' });
+        }
+
+        // Find the passenger in the ride
+        const passengerEntry = ride.passengers.find(p => p.user.toString() === passengerId);
+        if (!passengerEntry) {
+            return res.status(404).json({ message: 'Passenger not found in this ride' });
+        }
+
+        // Check if passenger was accepted
+        if (passengerEntry.status !== 'accepted') {
+            return res.status(400).json({ message: 'Can only rate accepted passengers' });
+        }
+
+        // Update rating
+        passengerEntry.driverRating = rating;
+        await ride.save();
+
+        // Update passenger's average rating
+        // We need to find all rides where this user was a passenger and has a driverRating
+        const allRidesWithRating = await Ride.find({
+            'passengers': {
+                $elemMatch: {
+                    user: passengerId,
+                    driverRating: { $exists: true, $ne: null }
+                }
+            }
+        });
+
+        let totalRating = 0;
+        let count = 0;
+
+        allRidesWithRating.forEach(r => {
+            r.passengers.forEach(p => {
+                if (p.user.toString() === passengerId && p.driverRating) {
+                    totalRating += p.driverRating;
+                    count++;
+                }
+            });
+        });
+
+        if (count > 0) {
+            const passengerUser = await User.findById(passengerId);
+            if (passengerUser) {
+                passengerUser.PassengerRating = totalRating / count;
+                await passengerUser.save();
+            }
+        }
+
+        res.json({ message: 'Passenger rated successfully' });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     createRide,
     findRides,
@@ -859,5 +1138,6 @@ module.exports = {
     acceptRideRequest,
     rejectRideRequest,
     startRide,
-    rateRide
+    rateRide,
+    ratePassenger
 };

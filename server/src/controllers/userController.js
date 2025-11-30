@@ -115,11 +115,11 @@ exports.updateUserProfile = async (req, res) => {
       user.bio = req.body.bio !== undefined ? req.body.bio : user.bio;
       user.avatar = req.body.avatar !== undefined ? req.body.avatar : user.avatar;
       user.hasOwnCar = req.body.hasOwnCar !== undefined ? req.body.hasOwnCar : user.hasOwnCar;
-      
+
       if (req.body.verifications) {
         user.verifications = { ...user.verifications, ...req.body.verifications };
       }
-      
+
       if (req.body.password) {
         user.password = req.body.password;
       }
@@ -217,164 +217,243 @@ exports.getUserStats = async (req, res) => {
 // @route   POST /api/users/rides/:id/confirm-completion
 // @access  Private
 exports.confirmRideCompletion = async (req, res) => {
-    try {
-        const rideId = req.params.id;
-        const passengerId = req.userId;
+  try {
+    const rideId = req.params.id;
+    const passengerId = req.userId;
 
-        const ride = await Ride.findById(rideId).populate('driver');
+    const ride = await Ride.findById(rideId).populate('driver');
 
-        if (!ride) {
-            return res.status(404).json({ message: 'Ride not found' });
-        }
-
-        const isPassenger = ride.passengers.some(p => p.user.equals(passengerId));
-
-        if (!isPassenger) {
-            return res.status(403).json({ message: 'You are not authorized to perform this action' });
-        }
-
-        ride.status = 'completed';
-        await ride.save();
-
-        // Notify driver
-        const driver = ride.driver;
-        driver.notifications.push({
-            title: 'Ride Completed',
-            desc: `The passenger has confirmed the completion of the ride from ${ride.startLocation.name} to ${ride.endLocation.name}.`,
-            type: 'ride-update'
-        });
-        await driver.save();
-
-        res.json({ message: 'Ride completion confirmed' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: error.message });
+    if (!ride) {
+      return res.status(404).json({ message: 'Ride not found' });
     }
+
+    const isPassenger = ride.passengers.some(p => p.user.equals(passengerId));
+
+    if (!isPassenger) {
+      return res.status(403).json({ message: 'You are not authorized to perform this action' });
+    }
+
+    ride.status = 'completed';
+    await ride.save();
+
+    // Notify driver
+    const driver = ride.driver;
+    driver.notifications.push({
+      title: 'Ride Completed',
+      desc: `The passenger has confirmed the completion of the ride from ${ride.startLocation.name} to ${ride.endLocation.name}.`,
+      type: 'ride-update'
+    });
+    await driver.save();
+
+    res.json({ message: 'Ride completion confirmed' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error.message });
+  }
 };
 
 // @desc    Add a friend
 // @route   POST /api/users/add-friend
 // @access  Private
 exports.addFriend = async (req, res) => {
-    try {
-        const { friendId } = req.body;
-        const userId = req.userId;
+  try {
+    const { friendId } = req.body;
+    const userId = req.userId;
 
-        if (!friendId) {
-            return res.status(400).json({ success: false, message: 'Friend ID is required' });
-        }
-
-        const user = await User.findById(userId);
-        const friend = await User.findById(friendId);
-
-        if (!user || !friend) {
-            return res.status(404).json({ success: false, message: 'User not found' });
-        }
-
-        // Check if already friends
-        if (user.friends.includes(friendId)) {
-            return res.status(400).json({ success: false, message: 'Already friends with this user' });
-        }
-
-        // Add friend
-        user.friends.push(friendId);
-        await user.save();
-
-        res.json({ success: true, message: 'Friend added successfully' });
-    } catch (err) {
-        console.error(err);
-        return res.status(500).json({ success: false, message: 'Server error' });
+    if (!friendId) {
+      return res.status(400).json({ success: false, message: 'Friend ID is required' });
     }
+
+    const user = await User.findById(userId);
+    const friend = await User.findById(friendId);
+
+    if (!user || !friend) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Check if already friends
+    if (user.friends.includes(friendId)) {
+      return res.status(400).json({ success: false, message: 'Already friends with this user' });
+    }
+
+    // Add friend
+    user.friends.push(friendId);
+    await user.save();
+
+    res.json({ success: true, message: 'Friend added successfully' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
 };
 
 // @desc    Get user's friends
 // @route   GET /api/users/friends
 // @access  Private
 exports.getFriends = async (req, res) => {
-    try {
-        const user = await User.findById(req.userId);
-        if (!user) {
-          return res.status(404).json({ success: false, message: 'User not found' });
-        }
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
 
-        // Find all completed rides where user was driver or passenger
-        const completedRides = await Ride.find({
+    // Find all completed rides where user was driver or passenger
+    const completedRides = await Ride.find({
+      status: 'completed',
+      $or: [
+        { driver: user._id },
+        { 'passengers.user': user._id }
+      ]
+    }).populate('driver', 'name email Rating avatar phone').populate('passengers.user', 'name email Rating avatar phone');
+
+    // Collect all unique user IDs (other than self) from these rides
+    const riderMap = new Map();
+    for (const ride of completedRides) {
+      // Add driver if not self
+      if (ride.driver && ride.driver._id.toString() !== user._id.toString()) {
+        riderMap.set(ride.driver._id.toString(), ride.driver);
+      }
+      // Add all passengers except self
+      for (const p of ride.passengers) {
+        if (p.user && p.user._id.toString() !== user._id.toString()) {
+          riderMap.set(p.user._id.toString(), p.user);
+        }
+      }
+    }
+
+    // Get ride counts for each rider
+    const friendsWithStats = await Promise.all(
+      Array.from(riderMap.values()).map(async (rider) => {
+        const ridesTogether = await Ride.countDocuments({
           status: 'completed',
           $or: [
-            { driver: user._id },
-            { 'passengers.user': user._id }
+            { driver: user._id, 'passengers.user': rider._id },
+            { driver: rider._id, 'passengers.user': user._id }
           ]
-        }).populate('driver', 'name email Rating avatar phone').populate('passengers.user', 'name email Rating avatar phone');
+        });
+        return {
+          _id: rider._id,
+          name: rider.name,
+          email: rider.email,
+          avatar: rider.avatar,
+          phone: rider.phone,
+          rating: rider.Rating || 0,
+          rides: ridesTogether
+        };
+      })
+    );
 
-        // Collect all unique user IDs (other than self) from these rides
-        const riderMap = new Map();
-        for (const ride of completedRides) {
-          // Add driver if not self
-          if (ride.driver && ride.driver._id.toString() !== user._id.toString()) {
-            riderMap.set(ride.driver._id.toString(), ride.driver);
-          }
-          // Add all passengers except self
-          for (const p of ride.passengers) {
-            if (p.user && p.user._id.toString() !== user._id.toString()) {
-              riderMap.set(p.user._id.toString(), p.user);
-            }
-          }
-        }
-
-        // Get ride counts for each rider
-        const friendsWithStats = await Promise.all(
-          Array.from(riderMap.values()).map(async (rider) => {
-            const ridesTogether = await Ride.countDocuments({
-              status: 'completed',
-              $or: [
-                { driver: user._id, 'passengers.user': rider._id },
-                { driver: rider._id, 'passengers.user': user._id }
-              ]
-            });
-            return {
-              _id: rider._id,
-              name: rider.name,
-              email: rider.email,
-              avatar: rider.avatar,
-              phone: rider.phone,
-              rating: rider.Rating || 0,
-              rides: ridesTogether
-            };
-          })
-        );
-
-        res.json({ success: true, friends: friendsWithStats });
-    } catch (err) {
-        console.error('Error in getFriends:', err);
-        return res.status(500).json({ success: false, message: 'Server error' });
-    }
+    res.json({ success: true, friends: friendsWithStats });
+  } catch (err) {
+    console.error('Error in getFriends:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
 };
 
 // @desc    Delete a friend
 // @route   DELETE /api/users/friends/:friendId
 // @access  Private
 exports.deleteFriend = async (req, res) => {
-    try {
-        const { friendId } = req.params;
-        const userId = req.userId;
+  try {
+    const { friendId } = req.params;
+    const userId = req.userId;
 
-        if (!friendId) {
-            return res.status(400).json({ success: false, message: 'Friend ID is required' });
-        }
-
-        const user = await User.findByIdAndUpdate(
-            userId,
-            { $pull: { friends: friendId } },
-            { new: true }
-        );
-
-        if (!user) {
-            return res.status(404).json({ success: false, message: 'User not found' });
-        }
-
-        res.json({ success: true, message: 'Friend removed successfully' });
-    } catch (err) {
-        console.error('Error in deleteFriend:', err);
-        return res.status(500).json({ success: false, message: 'Server error' });
+    if (!friendId) {
+      return res.status(400).json({ success: false, message: 'Friend ID is required' });
     }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $pull: { friends: friendId } },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    res.json({ success: true, message: 'Friend removed successfully' });
+  } catch (err) {
+    console.error('Error in deleteFriend:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+// @desc    Block a user
+// @route   POST /api/users/:id/block
+// @access  Private
+exports.blockUser = async (req, res) => {
+  try {
+    const userIdToBlock = req.params.id;
+    const currentUserId = req.userId;
+
+    if (userIdToBlock === currentUserId) {
+      return res.status(400).json({ success: false, message: 'You cannot block yourself' });
+    }
+
+    const user = await User.findById(currentUserId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (user.blockedUsers.includes(userIdToBlock)) {
+      return res.status(400).json({ success: false, message: 'User already blocked' });
+    }
+
+    user.blockedUsers.push(userIdToBlock);
+
+    // Also remove from friends if present
+    if (user.friends.includes(userIdToBlock)) {
+      user.friends = user.friends.filter(id => id.toString() !== userIdToBlock);
+    }
+
+    await user.save();
+
+    res.json({ success: true, message: 'User blocked successfully' });
+  } catch (err) {
+    console.error('Error in blockUser:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// @desc    Unblock a user
+// @route   POST /api/users/:id/unblock
+// @access  Private
+exports.unblockUser = async (req, res) => {
+  try {
+    const userIdToUnblock = req.params.id;
+    const currentUserId = req.userId;
+
+    const user = await User.findById(currentUserId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (!user.blockedUsers.includes(userIdToUnblock)) {
+      return res.status(400).json({ success: false, message: 'User is not blocked' });
+    }
+
+    user.blockedUsers = user.blockedUsers.filter(id => id.toString() !== userIdToUnblock);
+    await user.save();
+
+    res.json({ success: true, message: 'User unblocked successfully' });
+  } catch (err) {
+    console.error('Error in unblockUser:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// @desc    Get blocked users
+// @route   GET /api/users/blocked
+// @access  Private
+exports.getBlockedUsers = async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).populate('blockedUsers', 'name email avatar');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    res.json({ success: true, blockedUsers: user.blockedUsers || [] });
+  } catch (err) {
+    console.error('Error in getBlockedUsers:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
 };

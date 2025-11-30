@@ -45,12 +45,13 @@ export default function LeafletMapComponent({
     // Fit world by default (no hardcoded center)
     try {
       map.current.fitWorld()
-    } catch (_) {}
+    } catch (_) { }
 
     // Try to center on user's current location and add a marker
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
+          if (!map.current) return
           const { latitude, longitude } = pos.coords
           const latlng = [latitude, longitude]
           map.current.setView(latlng, zoom)
@@ -69,7 +70,7 @@ export default function LeafletMapComponent({
           // If permission denied or error, keep fitWorld without hardcoded fallback
           console.warn('Geolocation unavailable:', err?.message)
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 }
       )
     }
 
@@ -88,6 +89,7 @@ export default function LeafletMapComponent({
     const fetchRoute = async () => {
       try {
         const route = await getRoute(startLocation, endLocation)
+        if (!map.current) return
         setRouteInfo(route)
 
         // Remove existing route layer
