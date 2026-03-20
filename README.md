@@ -86,7 +86,7 @@ Frontend will run on **http://localhost:5173**
 
 ---
 
-## ✨ Features
+##  Features
 
 -  User authentication (signup/login)
 -  Offer rides with custom routes
