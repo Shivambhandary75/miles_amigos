@@ -1,4 +1,4 @@
-# 🚗 MilesAmigos
+#  MilesAmigos
 
 A modern carpooling platform that connects drivers and passengers for shared rides with real-time route tracking and location-based matching.
 
@@ -6,7 +6,7 @@ A modern carpooling platform that connects drivers and passengers for shared rid
 
 ---
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 ### Frontend
 
@@ -34,7 +34,7 @@ A modern carpooling platform that connects drivers and passengers for shared rid
 
 ---
 
-## 📦 Installation
+##  Installation
 
 ### Prerequisites
 
@@ -88,19 +88,19 @@ Frontend will run on **http://localhost:5173**
 
 ## ✨ Features
 
-- 🔐 User authentication (signup/login)
-- 🚙 Offer rides with custom routes
-- 🔍 Find available rides
-- 🗺️ Real-time route visualization on maps
-- 📍 Location autocomplete
-- 👤 User profiles with ratings
-- 📊 Dashboard with ride stats & earnings
-- 📜 Ride history tracking
-- 🛡️ Safety features
+-  User authentication (signup/login)
+-  Offer rides with custom routes
+-  Find available rides
+-  Real-time route visualization on maps
+-  Location autocomplete
+-  User profiles with ratings
+-  Dashboard with ride stats & earnings
+-  Ride history tracking
+-  Safety features
 
 ---
 
-## 🚀 Usage
+## Usage
 
 1. **Sign Up** - Create a new account
 2. **Login** - Access your dashboard
